@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import {
   Receipt,
@@ -35,6 +35,7 @@ function getTodayDateString(): string {
 }
 
 export default function AdminBillsDashboardPage() {
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   // Filters: default dates to today
@@ -43,6 +44,11 @@ export default function AdminBillsDashboardPage() {
   const [endDate, setEndDate] = useState<string>(todayStr);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<BillStatus | 'all'>('all');
+
+  // Directly focus the search bar input on page load
+  useEffect(() => {
+    searchInputRef.current?.focus();
+  }, []);
 
   // Pagination states (100 records per page)
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -174,7 +180,7 @@ export default function AdminBillsDashboardPage() {
   }, [bills, currentPage, PAGE_SIZE]);
 
   return (
-    <div id="admin-bills-dashboard-layout" className="flex flex-col min-h-screen bg-bg-app">
+    <div id="admin-bills-dashboard-layout" className="flex flex-col h-screen overflow-hidden bg-bg-app">
       {/* Top Navigation Bar */}
       <AdminHeader onToggleSidebar={() => setIsSidebarOpen(true)} onOpenSidebar={() => setIsSidebarOpen(true)} />
 
@@ -281,15 +287,17 @@ export default function AdminBillsDashboardPage() {
                     Search by Bill ID
                   </label>
                   <div className="relative">
+                    <Search className="w-4 h-4 text-muted absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none z-10" />
                     <input
+                      ref={searchInputRef}
                       id="bills-search-input"
                       type="text"
+                      autoFocus
                       placeholder="e.g. bill-260822-1 or 1001..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="input-base pl-9 text-sm"
+                      className="input-base input-with-icon-left text-sm"
                     />
-                    <Search className="w-4 h-4 text-muted absolute left-3 top-1/2 -translate-y-1/2" />
                     {searchQuery && (
                       <button
                         type="button"

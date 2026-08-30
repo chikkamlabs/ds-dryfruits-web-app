@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import {
   ShoppingBag,
@@ -35,6 +35,7 @@ function getTodayDateString(): string {
 }
 
 export default function AdminPurchasesDashboardPage() {
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'by_distributors' | 'by_products'>('by_distributors');
 
@@ -43,6 +44,11 @@ export default function AdminPurchasesDashboardPage() {
   const [startDate, setStartDate] = useState<string>(todayStr);
   const [endDate, setEndDate] = useState<string>(todayStr);
   const [searchQuery, setSearchQuery] = useState<string>('');
+
+  // Directly focus the search bar input on page load
+  useEffect(() => {
+    searchInputRef.current?.focus();
+  }, []);
 
   // Data states
   const [purchases, setPurchases] = useState<PurchaseWithDetails[]>([]);
@@ -205,7 +211,7 @@ export default function AdminPurchasesDashboardPage() {
   }, [totalRetailQty, totalWarehouseQty]);
 
   return (
-    <div id="admin-purchases-layout" className="flex flex-col min-h-screen bg-bg-app">
+    <div id="admin-purchases-layout" className="flex flex-col h-screen overflow-hidden bg-bg-app">
       {/* Top Navigation Bar */}
       <AdminHeader onToggleSidebar={() => setIsSidebarOpen(true)} onOpenSidebar={() => setIsSidebarOpen(true)} />
 
@@ -368,9 +374,9 @@ export default function AdminPurchasesDashboardPage() {
                     id="filter-by-distributors-tab"
                     type="button"
                     onClick={() => setViewMode('by_distributors')}
-                    className={`px-4 py-2 text-xs font-semibold rounded-md transition-colors layout-flex-start gap-1.5 ${
+                    className={`px-4 py-2 text-xs font-semibold rounded-md transition-all layout-flex-start gap-1.5 ${
                       viewMode === 'by_distributors'
-                        ? 'bg-primary text-inverted shadow-xs font-bold'
+                        ? 'bg-[#5d4037] text-white shadow-xs font-bold'
                         : 'text-text-secondary hover:text-text-primary hover:bg-surface'
                     }`}
                   >
@@ -382,9 +388,9 @@ export default function AdminPurchasesDashboardPage() {
                     id="filter-by-products-tab"
                     type="button"
                     onClick={() => setViewMode('by_products')}
-                    className={`px-4 py-2 text-xs font-semibold rounded-md transition-colors layout-flex-start gap-1.5 ${
+                    className={`px-4 py-2 text-xs font-semibold rounded-md transition-all layout-flex-start gap-1.5 ${
                       viewMode === 'by_products'
-                        ? 'bg-primary text-inverted shadow-xs font-bold'
+                        ? 'bg-[#5d4037] text-white shadow-xs font-bold'
                         : 'text-text-secondary hover:text-text-primary hover:bg-surface'
                     }`}
                   >
@@ -453,10 +459,12 @@ export default function AdminPurchasesDashboardPage() {
                       : 'Search Product Name / ID / Barcode'}
                   </label>
                   <div className="relative">
-                    <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
+                    <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none z-10" />
                     <input
+                      ref={searchInputRef}
                       id="search-purchases-input"
                       type="text"
+                      autoFocus
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       placeholder={
@@ -464,7 +472,7 @@ export default function AdminPurchasesDashboardPage() {
                           ? 'Search by distributor name, code, or bill ID...'
                           : 'Search by product name, code, category...'
                       }
-                      className="input-base pl-9 w-full"
+                      className="input-base input-with-icon-left w-full"
                     />
                   </div>
                 </div>

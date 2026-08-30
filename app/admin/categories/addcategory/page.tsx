@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -24,6 +24,29 @@ export default function AdminAddCategoryPage() {
   const [categoryId, setCategoryId] = useState('');
   const [status, setStatus] = useState<CategoryStatus>('active');
 
+  // Input refs for keyboard navigation
+  const nameRef = useRef<HTMLInputElement | null>(null);
+  const categoryIdRef = useRef<HTMLInputElement | null>(null);
+  const statusRef = useRef<HTMLSelectElement | null>(null);
+  const submitBtnRef = useRef<HTMLButtonElement | null>(null);
+
+  // Auto-focus category name on mount
+  useEffect(() => {
+    nameRef.current?.focus();
+  }, []);
+
+  // ESC key navigation to return to categories dashboard
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        router.push('/admin/categories/dashboard');
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [router]);
+
   // UI state
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -41,8 +64,8 @@ export default function AdminAddCategoryPage() {
     return true;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
 
     if (!validateForm()) {
       return;
@@ -168,16 +191,25 @@ export default function AdminAddCategoryPage() {
                   </label>
                   <input
                     id="category-name-input"
+                    ref={nameRef}
                     type="text"
                     value={name}
                     onChange={(e) => {
                       setName(e.target.value);
                       if (nameError) setNameError(null);
                     }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        categoryIdRef.current?.focus();
+                      } else if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        categoryIdRef.current?.focus();
+                      }
+                    }}
                     placeholder="e.g. Almonds, Cashews, Walnuts, Berries, Spices"
                     className={`input-base ${nameError ? 'input-error' : ''}`}
                     disabled={isSubmitting}
-                    autoFocus
                   />
                   {nameError && (
                     <span id="category-name-error" className="form-error">
@@ -196,9 +228,22 @@ export default function AdminAddCategoryPage() {
                   </label>
                   <input
                     id="category-id-input"
+                    ref={categoryIdRef}
                     type="text"
                     value={categoryId}
                     onChange={(e) => setCategoryId(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleSubmit();
+                      } else if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        nameRef.current?.focus();
+                      } else if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        statusRef.current?.focus();
+                      }
+                    }}
                     placeholder="e.g. cat-101 (leave empty for auto-generation)"
                     className="input-base font-mono"
                     disabled={isSubmitting}
@@ -215,8 +260,21 @@ export default function AdminAddCategoryPage() {
                   </label>
                   <select
                     id="category-status-select"
+                    ref={statusRef}
                     value={status}
                     onChange={(e) => setStatus(e.target.value as CategoryStatus)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleSubmit();
+                      } else if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        categoryIdRef.current?.focus();
+                      } else if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        submitBtnRef.current?.focus();
+                      }
+                    }}
                     className="select-base"
                     disabled={isSubmitting}
                   >
@@ -240,9 +298,10 @@ export default function AdminAddCategoryPage() {
 
                   <button
                     id="save-category-submit-btn"
+                    ref={submitBtnRef}
                     type="submit"
                     disabled={isSubmitting}
-                    className="btn-base btn-primary btn-md"
+                    className="btn-base btn-primary btn-md cursor-pointer"
                   >
                     <Save className="w-4 h-4" />
                     <span>{isSubmitting ? 'Saving Category...' : 'Save Category'}</span>

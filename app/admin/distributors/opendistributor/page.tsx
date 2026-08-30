@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useEffect, useState, useId, Suspense } from 'react';
+import React, { useEffect, useState, useId, useRef, Suspense } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   ArrowLeft,
   Truck,
@@ -31,6 +31,7 @@ import {
 } from '@/lib/distributorsStore';
 
 function OpenDistributorContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const distributorIdParam = searchParams.get('id');
 
@@ -44,6 +45,37 @@ function OpenDistributorContent() {
   const [editLocation, setEditLocation] = useState('');
   const [editNotes, setEditNotes] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+
+  // Input refs for keyboard navigation
+  const editNameRef = useRef<HTMLInputElement | null>(null);
+  const editLocationRef = useRef<HTMLInputElement | null>(null);
+  const editNotesRef = useRef<HTMLTextAreaElement | null>(null);
+  const saveDetailsBtnRef = useRef<HTMLButtonElement | null>(null);
+
+  // ESC key navigation to return to distributors dashboard
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (isEditing) {
+          setIsEditing(false);
+          return;
+        }
+        e.preventDefault();
+        router.push('/admin/distributors/dashboard');
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [router, isEditing]);
+
+  // Focus name input when edit mode is toggled on
+  useEffect(() => {
+    if (isEditing) {
+      setTimeout(() => {
+        editNameRef.current?.focus();
+      }, 50);
+    }
+  }, [isEditing]);
 
   // Feedback notifications
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -97,8 +129,8 @@ function OpenDistributorContent() {
   }, [distributorIdParam]);
 
   // Handle Save Edited Details
-  const handleSaveDetails = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSaveDetails = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (!distributor) return;
 
     if (!editName.trim()) {
@@ -389,9 +421,19 @@ function OpenDistributorContent() {
                           </label>
                           <input
                             id="edit-distributor-name-input"
+                            ref={editNameRef}
                             type="text"
                             value={editName}
                             onChange={(e) => setEditName(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                editLocationRef.current?.focus();
+                              } else if (e.key === 'ArrowDown') {
+                                e.preventDefault();
+                                editLocationRef.current?.focus();
+                              }
+                            }}
                             className="input-base"
                             required
                           />
@@ -404,9 +446,22 @@ function OpenDistributorContent() {
                           </label>
                           <input
                             id="edit-distributor-location-input"
+                            ref={editLocationRef}
                             type="text"
                             value={editLocation}
                             onChange={(e) => setEditLocation(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                editNotesRef.current?.focus();
+                              } else if (e.key === 'ArrowUp') {
+                                e.preventDefault();
+                                editNameRef.current?.focus();
+                              } else if (e.key === 'ArrowDown') {
+                                e.preventDefault();
+                                editNotesRef.current?.focus();
+                              }
+                            }}
                             placeholder="e.g. APMC Market, Navi Mumbai"
                             className="input-base"
                           />
@@ -420,8 +475,21 @@ function OpenDistributorContent() {
                         </label>
                         <textarea
                           id="edit-distributor-notes-input"
+                          ref={editNotesRef}
                           value={editNotes}
                           onChange={(e) => setEditNotes(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                              e.preventDefault();
+                              handleSaveDetails();
+                            } else if (e.key === 'ArrowUp' && (e.target as HTMLTextAreaElement).selectionStart === 0) {
+                              e.preventDefault();
+                              editLocationRef.current?.focus();
+                            } else if (e.key === 'ArrowDown' && (e.target as HTMLTextAreaElement).selectionStart === editNotes.length) {
+                              e.preventDefault();
+                              saveDetailsBtnRef.current?.focus();
+                            }
+                          }}
                           placeholder="e.g. Contact Person, Phone number, Delivery terms..."
                           className="textarea-base min-h-[5.5rem]"
                         />
@@ -441,9 +509,10 @@ function OpenDistributorContent() {
 
                         <button
                           id="save-distributor-details-btn"
+                          ref={saveDetailsBtnRef}
                           type="submit"
                           disabled={isSaving || !editName.trim()}
-                          className="btn-base btn-primary layout-flex-start gap-2 shadow-sm"
+                          className="btn-base btn-primary layout-flex-start gap-2 shadow-sm cursor-pointer"
                         >
                           {isSaving ? (
                             <>

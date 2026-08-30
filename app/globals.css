@@ -555,6 +555,10 @@ html, body {
   height: 2.375rem;
 }
 
+.input-with-icon-left {
+  padding-left: 2.5rem !important;
+}
+
 .select-base {
   height: 2.375rem;
   cursor: pointer;

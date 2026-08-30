@@ -31,6 +31,7 @@ interface BilledRowItem {
   id: string; // unique row id
   product_id: string;
   name: string;
+  discount: number;
   mrp: number;
   quantity: number;
   selling_price: number;
@@ -73,7 +74,6 @@ export default function CreateBillPage() {
 
   // Payment Section State
   const [discount, setDiscount] = useState<number>(0);
-  const [paymentMode, setPaymentMode] = useState<PaymentMode>('cash'); // 'cash' | 'upi' | 'credit'
   const [cashAmount, setCashAmount] = useState<string>('');
   const [upiAmount, setUpiAmount] = useState<string>('');
   const [creditAmount, setCreditAmount] = useState<string>('');
@@ -85,10 +85,8 @@ export default function CreateBillPage() {
   const cashAmountInputRef = useRef<HTMLInputElement | null>(null);
   const upiAmountInputRef = useRef<HTMLInputElement | null>(null);
   const creditAmountInputRef = useRef<HTMLInputElement | null>(null);
-  const cashBtnRef = useRef<HTMLButtonElement | null>(null);
-  const upiBtnRef = useRef<HTMLButtonElement | null>(null);
-  const creditBtnRef = useRef<HTMLButtonElement | null>(null);
   const saveBtnRef = useRef<HTMLButtonElement | null>(null);
+  const saveOnlyBtnRef = useRef<HTMLButtonElement | null>(null);
 
   // State refs for auto-drafting when unmounting / coming out
   const itemsRef = useRef<BilledRowItem[]>([]);
@@ -134,6 +132,7 @@ export default function CreateBillPage() {
           product_id: it.product_id,
           quantity: it.quantity,
           mrp: it.mrp,
+          discount: Number(it.discount) || 0,
           selling_price: it.selling_price,
           row_total: it.row_total,
         })),
@@ -242,14 +241,30 @@ export default function CreateBillPage() {
     }
 
     // New item to be added
+    const prodMrp = Number(prod.mrp) || 0;
+    const prodDiscount = Number(prod.discount) || 0;
+    const prodSellingPrice = Number(prod.selling_price) || 0;
+
+    let initialDiscount = prodDiscount;
+    let initialSellingPrice = prodSellingPrice;
+
+    if (initialDiscount > 0 && prodMrp > 0) {
+      initialSellingPrice = Number((prodMrp * (1 - initialDiscount / 100)).toFixed(2));
+    } else if (initialSellingPrice > 0 && prodMrp > 0 && initialSellingPrice < prodMrp && initialDiscount === 0) {
+      initialDiscount = Number((((prodMrp - initialSellingPrice) / prodMrp) * 100).toFixed(2));
+    } else if (initialSellingPrice === 0 && prodMrp > 0) {
+      initialSellingPrice = prodMrp;
+    }
+
     const newItem: BilledRowItem = {
       id: `row-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
       product_id: prod.id,
       name: prod.name,
-      mrp: Number(prod.mrp) || 0,
+      discount: initialDiscount,
+      mrp: prodMrp,
       quantity: 1,
-      selling_price: Number(prod.selling_price) || 0,
-      row_total: (Number(prod.selling_price) || 0) * 1,
+      selling_price: initialSellingPrice,
+      row_total: Number((initialSellingPrice * 1).toFixed(2)),
     };
 
     setItems((prev) => {
@@ -294,12 +309,30 @@ export default function CreateBillPage() {
     if (e.key === 'ArrowDown') {
       e.preventDefault();
       if (filteredProducts.length > 0) {
-        setSelectedProductIndex((prev) => (prev + 1) % filteredProducts.length);
+        setShowProductDropdown(true);
+        setSelectedProductIndex((prev) => {
+          const nextIdx = (prev + 1) % filteredProducts.length;
+          setTimeout(() => {
+            document.getElementById(`product-opt-${filteredProducts[nextIdx]?.id}`)?.scrollIntoView({
+              block: 'nearest',
+            });
+          }, 10);
+          return nextIdx;
+        });
       }
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       if (filteredProducts.length > 0) {
-        setSelectedProductIndex((prev) => (prev - 1 + filteredProducts.length) % filteredProducts.length);
+        setShowProductDropdown(true);
+        setSelectedProductIndex((prev) => {
+          const nextIdx = (prev - 1 + filteredProducts.length) % filteredProducts.length;
+          setTimeout(() => {
+            document.getElementById(`product-opt-${filteredProducts[nextIdx]?.id}`)?.scrollIntoView({
+              block: 'nearest',
+            });
+          }, 10);
+          return nextIdx;
+        });
       }
     } else if (e.key === 'Enter') {
       e.preventDefault();
@@ -332,6 +365,22 @@ export default function CreateBillPage() {
     });
   };
 
+  // Handle Discount % Change
+  const updateDiscount = (rowIndex: number, newDiscount: number) => {
+    setItems((prev) => {
+      const updated = [...prev];
+      const row = updated[rowIndex];
+      if (row) {
+        const safeDiscount = Math.max(0, Math.min(100, newDiscount));
+        row.discount = safeDiscount;
+        const calculatedSellingPrice = Number((row.mrp * (1 - safeDiscount / 100)).toFixed(2));
+        row.selling_price = calculatedSellingPrice;
+        row.row_total = Number((row.quantity * calculatedSellingPrice).toFixed(2));
+      }
+      return updated;
+    });
+  };
+
   // Handle Selling Price Change
   const updateSellingPrice = (rowIndex: number, newPrice: number) => {
     setItems((prev) => {
@@ -340,6 +389,9 @@ export default function CreateBillPage() {
       if (row) {
         const safePrice = Math.max(0, newPrice);
         row.selling_price = safePrice;
+        if (row.mrp > 0 && safePrice <= row.mrp) {
+          row.discount = Number((((row.mrp - safePrice) / row.mrp) * 100).toFixed(2));
+        }
         row.row_total = Number((row.quantity * safePrice).toFixed(2));
       }
       return updated;
@@ -496,15 +548,25 @@ export default function CreateBillPage() {
     const cAmt = parseFloat(cashAmount) || 0;
     const uAmt = parseFloat(upiAmount) || 0;
     const crAmt = parseFloat(creditAmount) || 0;
+    const totalAllocated = cAmt + uAmt + crAmt;
+    const remainingToPay = Math.round((total - totalAllocated) * 100) / 100;
+
+    if (status === 'completed' && Math.abs(remainingToPay) >= 0.01) {
+      setFeedback({
+        type: 'error',
+        message: `Payment not fully settled. Remaining amount must be ₹0.00 (Currently: ₹${remainingToPay.toFixed(2)}) to save.`,
+      });
+      return;
+    }
 
     const paymentsList: { mode: PaymentMode; amount: number }[] = [];
     if (cAmt > 0) paymentsList.push({ mode: 'cash', amount: cAmt });
     if (uAmt > 0) paymentsList.push({ mode: 'upi', amount: uAmt });
     if (crAmt > 0) paymentsList.push({ mode: 'credit', amount: crAmt });
 
-    // If no specific amounts were entered, fallback to full amount in active paymentMode
-    if (paymentsList.length === 0 && total > 0 && status === 'completed') {
-      paymentsList.push({ mode: paymentMode || 'cash', amount: total });
+    // If total is 0, allow 0 cash payment
+    if (paymentsList.length === 0 && total === 0 && status === 'completed') {
+      paymentsList.push({ mode: 'cash', amount: 0 });
     }
 
     const hasCredit = paymentsList.some((p) => p.mode === 'credit' && p.amount > 0);
@@ -520,6 +582,8 @@ export default function CreateBillPage() {
     setSaving(true);
     setFeedback(null);
 
+    const primaryMode: PaymentMode = (paymentsList[0]?.mode as PaymentMode) || 'cash';
+
     const billPayload = {
       customer_id: selectedCustomer ? selectedCustomer.id : null,
       subtotal,
@@ -527,12 +591,13 @@ export default function CreateBillPage() {
       total,
       status,
       payments: status === 'completed' ? paymentsList : undefined,
-      paymentMode: status === 'completed' ? (paymentsList[0]?.mode || paymentMode) : undefined,
-      paymentAmount: status === 'completed' ? (paymentsList.reduce((acc, p) => acc + p.amount, 0) || total) : 0,
+      paymentMode: status === 'completed' ? primaryMode : undefined,
+      paymentAmount: status === 'completed' ? (paymentsList.reduce((acc, p) => acc + p.amount, 0)) : 0,
       items: items.map((it) => ({
         product_id: it.product_id,
         quantity: it.quantity,
         mrp: it.mrp,
+        discount: Number(it.discount) || 0,
         selling_price: it.selling_price,
         row_total: it.row_total,
       })),
@@ -564,7 +629,6 @@ export default function CreateBillPage() {
         setCashAmount('');
         setUpiAmount('');
         setCreditAmount('');
-        setPaymentMode('cash');
         isSavedRef.current = false;
         productSearchInputRef.current?.focus();
       }, 1200);
@@ -688,21 +752,27 @@ export default function CreateBillPage() {
                     {showProductDropdown && filteredProducts.length > 0 && (
                       <div
                         id="product-search-dropdown"
-                        className="dropdown-panel absolute left-0 right-0 top-full mt-1.5 z-50 max-h-64 overflow-y-auto"
+                        className="dropdown-panel absolute left-0 right-0 top-full mt-1.5 z-50 max-h-64 overflow-y-auto shadow-lg rounded-lg border border-border bg-surface"
                       >
                         {filteredProducts.map((p, idx) => (
                           <div
                             key={p.id}
                             id={`product-opt-${p.id}`}
                             onClick={() => addProductToBill(p)}
-                            className={`p-3 layout-flex-between cursor-pointer border-b border-subtle last:border-none transition-colors ${
+                            onMouseEnter={() => setSelectedProductIndex(idx)}
+                            className={`p-3 layout-flex-between cursor-pointer border-b border-subtle last:border-none transition-all ${
                               idx === selectedProductIndex
-                                ? 'bg-primary-light text-primary font-semibold'
+                                ? 'bg-primary-light text-primary font-semibold ring-2 ring-inset ring-primary'
                                 : 'hover:bg-surface-hover bg-surface'
                             }`}
                           >
                             <div className="flex flex-col">
-                              <span className="text-body font-medium text-primary">{p.name}</span>
+                              <div className="flex items-center gap-2">
+                                {idx === selectedProductIndex && (
+                                  <span className="w-2 h-2 rounded-full bg-primary shrink-0 animate-pulse" />
+                                )}
+                                <span className="text-body font-medium text-primary">{p.name}</span>
+                              </div>
                               <span className="text-small text-muted flex items-center gap-2">
                                 <span>Code: {p.product_id}</span>
                                 {p.barcode && <span>• Barcode: {p.barcode}</span>}
@@ -738,6 +808,7 @@ export default function CreateBillPage() {
                         <tr>
                           <th className="table-th w-12 text-center">S.No</th>
                           <th className="table-th">Product Name</th>
+                          <th className="table-th w-24 text-center">Discount (%)</th>
                           <th className="table-th w-24 text-right">MRP (₹)</th>
                           <th className="table-th w-32 text-center">Quantity</th>
                           <th className="table-th w-32 text-right">Selling Price (₹)</th>
@@ -748,7 +819,7 @@ export default function CreateBillPage() {
                       <tbody>
                         {items.length === 0 ? (
                           <tr>
-                            <td colSpan={7} className="p-8 text-center text-muted text-body">
+                            <td colSpan={8} className="p-8 text-center text-muted text-body">
                               No products added to bill yet. Scan a barcode or search a product above.
                             </td>
                           </tr>
@@ -760,6 +831,19 @@ export default function CreateBillPage() {
                               </td>
                               <td className="table-td font-medium">
                                 <span className="text-body">{row.name}</span>
+                              </td>
+                              <td className="table-td text-center">
+                                <input
+                                  id={`bill-row-discount-${index}`}
+                                  type="number"
+                                  step="any"
+                                  min="0"
+                                  max="100"
+                                  value={row.discount}
+                                  onChange={(e) => updateDiscount(index, parseFloat(e.target.value) || 0)}
+                                  placeholder="0"
+                                  className="input-base h-8 text-center font-bold px-1 w-20"
+                                />
                               </td>
                               <td className="table-td text-right text-muted">
                                 ₹{row.mrp.toFixed(2)}
@@ -950,9 +1034,8 @@ export default function CreateBillPage() {
                         value={discount}
                         onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)}
                         onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
+                          if (e.key === 'Enter' || e.key === 'ArrowDown') {
                             e.preventDefault();
-                            // When user presses enter after discount, focus cash amount input
                             cashAmountInputRef.current?.focus();
                             cashAmountInputRef.current?.select();
                           }
@@ -1005,7 +1088,11 @@ export default function CreateBillPage() {
                         value={cashAmount}
                         onChange={(e) => setCashAmount(e.target.value)}
                         onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
+                          if (e.key === 'ArrowUp') {
+                            e.preventDefault();
+                            discountInputRef.current?.focus();
+                            discountInputRef.current?.select();
+                          } else if (e.key === 'Enter' || e.key === 'ArrowDown') {
                             e.preventDefault();
                             upiAmountInputRef.current?.focus();
                             upiAmountInputRef.current?.select();
@@ -1031,7 +1118,11 @@ export default function CreateBillPage() {
                         value={upiAmount}
                         onChange={(e) => setUpiAmount(e.target.value)}
                         onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
+                          if (e.key === 'ArrowUp') {
+                            e.preventDefault();
+                            cashAmountInputRef.current?.focus();
+                            cashAmountInputRef.current?.select();
+                          } else if (e.key === 'Enter' || e.key === 'ArrowDown') {
                             e.preventDefault();
                             creditAmountInputRef.current?.focus();
                             creditAmountInputRef.current?.select();
@@ -1057,7 +1148,11 @@ export default function CreateBillPage() {
                         value={creditAmount}
                         onChange={(e) => setCreditAmount(e.target.value)}
                         onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
+                          if (e.key === 'ArrowUp') {
+                            e.preventDefault();
+                            upiAmountInputRef.current?.focus();
+                            upiAmountInputRef.current?.select();
+                          } else if (e.key === 'Enter' || e.key === 'ArrowDown') {
                             e.preventDefault();
                             saveBtnRef.current?.focus();
                           }
@@ -1066,143 +1161,119 @@ export default function CreateBillPage() {
                       />
                     </div>
 
-                    {/* Total Split Summary Indicator */}
+                    {/* Total Split & Remaining Indicator */}
                     {(() => {
                       const enteredCash = parseFloat(cashAmount) || 0;
                       const enteredUpi = parseFloat(upiAmount) || 0;
                       const enteredCredit = parseFloat(creditAmount) || 0;
                       const totalEntered = enteredCash + enteredUpi + enteredCredit;
-                      const diff = total - totalEntered;
-                      if (totalEntered > 0 && Math.abs(diff) > 0.01) {
-                        return (
-                          <div className="text-xs flex justify-between pt-1 text-muted">
-                            <span>Allocated: ₹{totalEntered.toFixed(2)}</span>
-                            <span className={diff > 0 ? 'text-warning font-semibold' : 'text-success font-semibold'}>
-                              {diff > 0 ? `Remaining: ₹${diff.toFixed(2)}` : `Overpaid: ₹${Math.abs(diff).toFixed(2)}`}
-                            </span>
+                      const remainingAmount = Math.round((total - totalEntered) * 100) / 100;
+                      const isRemainingZero = items.length > 0 && Math.abs(remainingAmount) < 0.01;
+
+                      return (
+                        <div className="flex flex-col gap-1 pt-1.5 border-t border-subtle">
+                          <div className="text-xs flex justify-between">
+                            <span className="text-secondary">Allocated: ₹{totalEntered.toFixed(2)}</span>
+                            {items.length === 0 ? (
+                              <span className="text-muted">No items in bill</span>
+                            ) : isRemainingZero ? (
+                              <span className="text-success font-bold flex items-center gap-1">
+                                <CheckCircle2 className="w-3 h-3" /> Remaining: ₹0.00 (Settled)
+                              </span>
+                            ) : remainingAmount > 0 ? (
+                              <span className="text-warning font-bold">
+                                Remaining: ₹{remainingAmount.toFixed(2)}
+                              </span>
+                            ) : (
+                              <span className="text-danger font-bold">
+                                Overpaid: ₹{Math.abs(remainingAmount).toFixed(2)}
+                              </span>
+                            )}
                           </div>
-                        );
-                      }
-                      return null;
+                          {parseFloat(creditAmount) > 0 && (
+                            <p className="text-caption text-warning">
+                              * Credit sale will automatically update customer ledger & credit balance.
+                            </p>
+                          )}
+                        </div>
+                      );
                     })()}
                   </div>
 
-                  {/* Payment Mode Selection Quick Toggles (Optional) */}
-                  <div className="flex flex-col gap-1.5">
-                    <label className="form-label text-xs">Quick Mode Presets</label>
-                    <div
-                      id="payment-mode-selector"
-                      className="grid grid-cols-3 gap-2"
-                    >
-                      <button
-                        ref={cashBtnRef}
-                        type="button"
-                        id="pay-mode-cash-btn"
-                        onClick={() => {
-                          setPaymentMode('cash');
-                          setCashAmount(total > 0 ? String(total) : '');
-                          setUpiAmount('');
-                          setCreditAmount('');
-                          cashAmountInputRef.current?.focus();
-                        }}
-                        className={`btn-base py-2 flex flex-col items-center justify-center gap-1 text-xs font-bold rounded-lg border transition-all cursor-pointer ${
-                          paymentMode === 'cash'
-                            ? 'bg-primary text-inverted border-primary shadow-sm'
-                            : 'bg-surface text-secondary border-border hover:bg-surface-hover'
-                        }`}
-                      >
-                        <Banknote className="w-3.5 h-3.5" />
-                        <span>Cash</span>
-                      </button>
+                  {/* Actions: Save & Print / Save Only / Draft */}
+                  {(() => {
+                    const enteredCash = parseFloat(cashAmount) || 0;
+                    const enteredUpi = parseFloat(upiAmount) || 0;
+                    const enteredCredit = parseFloat(creditAmount) || 0;
+                    const totalEntered = enteredCash + enteredUpi + enteredCredit;
+                    const remainingAmount = Math.round((total - totalEntered) * 100) / 100;
+                    const isRemainingZero = items.length > 0 && Math.abs(remainingAmount) < 0.01;
 
-                      <button
-                        ref={upiBtnRef}
-                        type="button"
-                        id="pay-mode-upi-btn"
-                        onClick={() => {
-                          setPaymentMode('upi');
-                          setUpiAmount(total > 0 ? String(total) : '');
-                          setCashAmount('');
-                          setCreditAmount('');
-                          upiAmountInputRef.current?.focus();
-                        }}
-                        className={`btn-base py-2 flex flex-col items-center justify-center gap-1 text-xs font-bold rounded-lg border transition-all cursor-pointer ${
-                          paymentMode === 'upi'
-                            ? 'bg-primary text-inverted border-primary shadow-sm'
-                            : 'bg-surface text-secondary border-border hover:bg-surface-hover'
-                        }`}
-                      >
-                        <Smartphone className="w-3.5 h-3.5" />
-                        <span>UPI</span>
-                      </button>
+                    return (
+                      <div className="flex flex-col gap-2.5 pt-2">
+                        <button
+                          ref={saveBtnRef}
+                          id="save-and-print-bill-btn"
+                          type="button"
+                          disabled={saving || items.length === 0 || !isRemainingZero}
+                          onClick={() => handleSaveBill('completed', true)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'ArrowUp') {
+                              e.preventDefault();
+                              creditAmountInputRef.current?.focus();
+                              creditAmountInputRef.current?.select();
+                            } else if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+                              e.preventDefault();
+                              saveOnlyBtnRef.current?.focus();
+                            }
+                          }}
+                          className={`btn-base btn-primary h-11 w-full text-base font-bold shadow-md flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-primary-focus ${
+                            saving || items.length === 0 || !isRemainingZero
+                              ? 'opacity-50 cursor-not-allowed'
+                              : 'cursor-pointer'
+                          }`}
+                        >
+                          <Printer className="w-5 h-5" />
+                          <span>{saving ? 'Processing...' : 'Save & Print'}</span>
+                        </button>
 
-                      <button
-                        ref={creditBtnRef}
-                        type="button"
-                        id="pay-mode-credit-btn"
-                        onClick={() => {
-                          setPaymentMode('credit');
-                          setCreditAmount(total > 0 ? String(total) : '');
-                          setCashAmount('');
-                          setUpiAmount('');
-                          creditAmountInputRef.current?.focus();
-                        }}
-                        className={`btn-base py-2 flex flex-col items-center justify-center gap-1 text-xs font-bold rounded-lg border transition-all cursor-pointer ${
-                          paymentMode === 'credit'
-                            ? 'bg-warning text-inverted border-warning shadow-sm'
-                            : 'bg-surface text-secondary border-border hover:bg-surface-hover'
-                        }`}
-                      >
-                        <CreditCard className="w-3.5 h-3.5" />
-                        <span>Credit</span>
-                      </button>
-                    </div>
+                        <div className="grid grid-cols-2 gap-2.5">
+                          <button
+                            ref={saveOnlyBtnRef}
+                            id="save-completed-bill-btn"
+                            type="button"
+                            disabled={saving || items.length === 0 || !isRemainingZero}
+                            onClick={() => handleSaveBill('completed', false)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'ArrowUp') {
+                                e.preventDefault();
+                                saveBtnRef.current?.focus();
+                              }
+                            }}
+                            className={`btn-base btn-secondary py-2.5 px-4 text-sm font-semibold rounded-lg flex items-center justify-center gap-2 shadow-xs ${
+                              saving || items.length === 0 || !isRemainingZero
+                                ? 'opacity-50 cursor-not-allowed'
+                                : 'cursor-pointer'
+                            }`}
+                          >
+                            <Save className="w-4 h-4" />
+                            <span>Save Only</span>
+                          </button>
 
-                    {(paymentMode === 'credit' || parseFloat(creditAmount) > 0) && (
-                      <p className="text-caption text-warning mt-1">
-                        * Credit sale will automatically update customer ledger & credit balance.
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Actions: Save & Print / Draft */}
-                  <div className="flex flex-col gap-2.5 pt-2">
-                    <button
-                      ref={saveBtnRef}
-                      id="save-and-print-bill-btn"
-                      type="button"
-                      disabled={saving || items.length === 0}
-                      onClick={() => handleSaveBill('completed', true)}
-                      className="btn-base btn-primary h-11 w-full text-base font-bold shadow-md flex items-center justify-center gap-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary-focus"
-                    >
-                      <Printer className="w-5 h-5" />
-                      <span>{saving ? 'Processing...' : 'Save & Print'}</span>
-                    </button>
-
-                    <div className="grid grid-cols-2 gap-2.5">
-                      <button
-                        id="save-completed-bill-btn"
-                        type="button"
-                        disabled={saving || items.length === 0}
-                        onClick={() => handleSaveBill('completed', false)}
-                        className="btn-base btn-secondary py-2.5 px-4 text-sm font-semibold rounded-lg flex items-center justify-center gap-2 cursor-pointer shadow-xs"
-                      >
-                        <Save className="w-4 h-4" />
-                        <span>Save Only</span>
-                      </button>
-
-                      <button
-                        id="save-draft-bill-btn"
-                        type="button"
-                        disabled={saving || items.length === 0}
-                        onClick={() => handleSaveBill('draft', false)}
-                        className="btn-base btn-outline py-2.5 px-4 text-sm font-semibold rounded-lg flex items-center justify-center gap-2 cursor-pointer shadow-xs"
-                      >
-                        <FileText className="w-4 h-4" />
-                        <span>Save Draft</span>
-                      </button>
-                    </div>
-                  </div>
+                          <button
+                            id="save-draft-bill-btn"
+                            type="button"
+                            disabled={saving || items.length === 0}
+                            onClick={() => handleSaveBill('draft', false)}
+                            className="btn-base btn-outline py-2.5 px-4 text-sm font-semibold rounded-lg flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+                          >
+                            <FileText className="w-4 h-4" />
+                            <span>Save Draft</span>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
             </div>

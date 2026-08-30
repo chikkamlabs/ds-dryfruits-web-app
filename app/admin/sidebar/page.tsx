@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   Home,
   Receipt,
@@ -17,20 +17,49 @@ import {
 } from 'lucide-react';
 
 const ADMIN_SIDEBAR_ITEMS = [
-  { label: 'Home', href: '/admin/dashboard', icon: Home },
-  { label: 'Bills', href: '/admin/bills/dashboard', icon: Receipt },
-  { label: 'Purchases', href: '/admin/purchases/dashboard', icon: ShoppingBag },
-  { label: 'Customers', href: '/admin/customers/dashboard', icon: Users },
-  { label: 'Inventory', href: '/admin/products/dashboard', icon: Boxes },
-  { label: 'Categories', href: '/admin/categories/dashboard', icon: Tags },
-  { label: 'Distributors', href: '/admin/distributors/dashboard', icon: Truck },
-  { label: 'Total Payments', href: '/admin/payments', icon: Wallet },
+  { key: 'home', label: 'Home (F1)', shortcut: 'F1', href: '/admin/dashboard', icon: Home },
+  { key: 'bills', label: 'Bills (F2)', shortcut: 'F2', href: '/admin/bills/dashboard', icon: Receipt },
+  { key: 'purchases', label: 'Purchases (F3)', shortcut: 'F3', href: '/admin/purchases/dashboard', icon: ShoppingBag },
+  { key: 'customers', label: 'Customers (F4)', shortcut: 'F4', href: '/admin/customers/dashboard', icon: Users },
+  { key: 'inventory', label: 'Inventory (F5)', shortcut: 'F5', href: '/admin/products/dashboard', icon: Boxes },
+  { key: 'categories', label: 'Categories (F6)', shortcut: 'F6', href: '/admin/categories/dashboard', icon: Tags },
+  { key: 'distributors', label: 'Distributors (F7)', shortcut: 'F7', href: '/admin/distributors/dashboard', icon: Truck },
+  { key: 'payments', label: 'Total Payments (F8)', shortcut: 'F8', href: '/admin/payments', icon: Wallet },
 ];
 
 export default function AdminSidebar(props: any) {
   const pathname = usePathname();
+  const router = useRouter();
   const isOpen = Boolean(props?.isOpen);
   const onClose = props?.onClose as (() => void) | undefined;
+
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const shortcutMap: Record<string, string> = {
+        F1: '/admin/dashboard',
+        F2: '/admin/bills/dashboard',
+        F3: '/admin/purchases/dashboard',
+        F4: '/admin/customers/dashboard',
+        F5: '/admin/products/dashboard',
+        F6: '/admin/categories/dashboard',
+        F7: '/admin/distributors/dashboard',
+        F8: '/admin/payments',
+      };
+
+      if (shortcutMap[e.key]) {
+        e.preventDefault();
+        if (onClose) {
+          onClose();
+        }
+        router.push(shortcutMap[e.key]);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [router, onClose]);
 
   const handleLinkClick = () => {
     if (onClose) {
@@ -46,18 +75,18 @@ export default function AdminSidebar(props: any) {
           item.href === '/admin/dashboard'
             ? pathname === '/admin/dashboard'
             : pathname.startsWith(item.href) ||
-              (item.label === 'Bills' && (pathname.includes('/admin/bills') || pathname.includes('/admin/createbill') || pathname.includes('/admin/openbill'))) ||
-              (item.label === 'Purchases' && pathname.includes('/admin/purchases')) ||
-              (item.label === 'Categories' && pathname.includes('/admin/categories')) ||
-              (item.label === 'Distributors' && pathname.includes('/admin/distributors')) ||
-              (item.label === 'Customers' && pathname.includes('/admin/customers')) ||
-              (item.label === 'Inventory' && pathname.includes('/admin/products')) ||
-              (item.label === 'Total Payments' && (pathname.includes('/admin/payments') || pathname.includes('/admin/expenses')));
+              (item.key === 'bills' && (pathname.includes('/admin/bills') || pathname.includes('/admin/createbill') || pathname.includes('/admin/openbill'))) ||
+              (item.key === 'purchases' && pathname.includes('/admin/purchases')) ||
+              (item.key === 'categories' && pathname.includes('/admin/categories')) ||
+              (item.key === 'distributors' && pathname.includes('/admin/distributors')) ||
+              (item.key === 'customers' && pathname.includes('/admin/customers')) ||
+              (item.key === 'inventory' && pathname.includes('/admin/products')) ||
+              (item.key === 'payments' && (pathname.includes('/admin/payments') || pathname.includes('/admin/expenses')));
 
         return (
           <Link
-            key={item.label}
-            id={`sidebar-item-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
+            key={item.key}
+            id={`sidebar-item-${item.key}`}
             href={item.href}
             onClick={handleLinkClick}
             className={`sidebar-nav-item ${isActive ? 'sidebar-nav-item-active' : ''}`}

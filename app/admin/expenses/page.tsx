@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   TrendingUp,
   Plus,
@@ -28,6 +29,8 @@ import {
 import type { Expense, ExpensePaymentMode } from '../../../lib/types';
 
 export default function AdminExpensesPage() {
+  const router = useRouter();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const todayStr = new Date().toISOString().split('T')[0];
 
   // Filters (Date from to default today)
@@ -49,6 +52,39 @@ export default function AdminExpensesPage() {
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  // Input refs for modal keyboard navigation
+  const amountInputRef = useRef<HTMLInputElement | null>(null);
+  const paymentCashBtnRef = useRef<HTMLButtonElement | null>(null);
+  const paymentUpiBtnRef = useRef<HTMLButtonElement | null>(null);
+  const notesInputRef = useRef<HTMLTextAreaElement | null>(null);
+  const saveExpenseBtnRef = useRef<HTMLButtonElement | null>(null);
+
+  // Auto focus Amount input when Add Expense modal opens
+  useEffect(() => {
+    if (isAddModalOpen) {
+      setTimeout(() => {
+        amountInputRef.current?.focus();
+        amountInputRef.current?.select();
+      }, 50);
+    }
+  }, [isAddModalOpen]);
+
+  // ESC key navigation to tap back arrow and return to payments
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (isAddModalOpen) {
+          setIsAddModalOpen(false);
+          return;
+        }
+        e.preventDefault();
+        router.push('/admin/payments');
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [router, isAddModalOpen]);
 
   // Delete State
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -203,15 +239,19 @@ export default function AdminExpensesPage() {
   };
 
   return (
-    <div id="admin-expenses-layout" className="flex min-h-screen bg-[var(--color-bg-app)]">
-      {/* Sidebar */}
-      <AdminSidebar />
+    <div id="admin-expenses-layout" className="flex flex-col h-screen overflow-hidden bg-bg-app">
+      {/* Top Navigation Bar */}
+      <AdminHeader
+        onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
+        onOpenSidebar={() => setIsSidebarOpen(true)}
+      />
 
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0">
-        <AdminHeader title="Expenses Management" />
+      <div className="flex flex-1 overflow-hidden relative">
+        {/* Sidebar */}
+        <AdminSidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
 
-        <main className="flex-1 p-4 md:p-6 max-w-7xl w-full mx-auto space-y-6">
+        {/* Main Content Area */}
+        <main id="admin-expenses-main" className="flex-1 overflow-y-auto p-4 md:p-6 max-w-7xl w-full mx-auto space-y-6">
           {/* Breadcrumb & Header Row */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-[var(--color-border-subtle)]">
             <div className="flex items-center gap-3">
@@ -224,6 +264,17 @@ export default function AdminExpensesPage() {
               </Link>
 
               <div>
+                <div className="breadcrumb-nav mb-1">
+                  <Link href="/admin/dashboard" className="breadcrumb-item">
+                    Home
+                  </Link>
+                  <span>/</span>
+                  <Link href="/admin/payments" className="breadcrumb-item">
+                    Payments
+                  </Link>
+                  <span>/</span>
+                  <span className="breadcrumb-item-active">Expenses</span>
+                </div>
                 <h1 className="text-page-title text-xl md:text-2xl font-bold text-[var(--color-text-primary)]">
                   Expenses Table
                 </h1>
@@ -343,13 +394,13 @@ export default function AdminExpensesPage() {
                   Date From:
                 </label>
                 <div className="relative">
-                  <Calendar className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] pointer-events-none" />
+                  <Calendar className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] pointer-events-none z-10" />
                   <input
                     id="filter-expense-start-date"
                     type="date"
                     value={startDate}
                     onChange={(e) => setStartDate(e.target.value)}
-                    className="input-base text-sm pl-9 py-2 w-full"
+                    className="input-base input-with-icon-left text-sm py-2 w-full"
                   />
                 </div>
               </div>
@@ -360,13 +411,13 @@ export default function AdminExpensesPage() {
                   Date To:
                 </label>
                 <div className="relative">
-                  <Calendar className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] pointer-events-none" />
+                  <Calendar className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] pointer-events-none z-10" />
                   <input
                     id="filter-expense-end-date"
                     type="date"
                     value={endDate}
                     onChange={(e) => setEndDate(e.target.value)}
-                    className="input-base text-sm pl-9 py-2 w-full"
+                    className="input-base input-with-icon-left text-sm py-2 w-full"
                   />
                 </div>
               </div>
@@ -377,14 +428,14 @@ export default function AdminExpensesPage() {
                   Search Notes / Amount:
                 </label>
                 <div className="relative">
-                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] pointer-events-none" />
+                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] pointer-events-none z-10" />
                   <input
                     id="filter-expense-search"
                     type="text"
                     placeholder="Search notes or amount..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="input-base text-sm pl-9 py-2 w-full"
+                    className="input-base input-with-icon-left text-sm py-2 w-full"
                   />
                 </div>
               </div>
@@ -573,11 +624,12 @@ export default function AdminExpensesPage() {
                   Amount (₹) <span className="text-red-500">*</span>
                 </label>
                 <div className="relative mt-1">
-                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-base font-bold text-[var(--color-text-muted)]">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-base font-bold text-[var(--color-text-muted)] pointer-events-none z-10">
                     ₹
                   </span>
                   <input
                     id="input-expense-amount"
+                    ref={amountInputRef}
                     type="number"
                     step="0.01"
                     min="0.01"
@@ -586,7 +638,17 @@ export default function AdminExpensesPage() {
                     placeholder="0.00"
                     value={amountInput}
                     onChange={(e) => setAmountInput(e.target.value)}
-                    className="input-base pl-8 py-2.5 text-base font-semibold w-full"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        if (typeInput === 'cash') {
+                          paymentCashBtnRef.current?.focus();
+                        } else {
+                          paymentUpiBtnRef.current?.focus();
+                        }
+                      }
+                    }}
+                    className="input-base input-with-icon-left py-2.5 text-base font-semibold w-full"
                   />
                 </div>
               </div>
@@ -600,7 +662,19 @@ export default function AdminExpensesPage() {
                   <button
                     type="button"
                     id="btn-select-cash"
+                    ref={paymentCashBtnRef}
                     onClick={() => setTypeInput('cash')}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        setTypeInput('cash');
+                        notesInputRef.current?.focus();
+                      } else if (e.key === 'ArrowRight') {
+                        e.preventDefault();
+                        setTypeInput('upi');
+                        paymentUpiBtnRef.current?.focus();
+                      }
+                    }}
                     className={`p-3 rounded-lg border flex items-center justify-center gap-2 font-medium transition-all ${
                       typeInput === 'cash'
                         ? 'border-emerald-600 bg-emerald-50 text-emerald-800 ring-2 ring-emerald-500/20'
@@ -614,7 +688,19 @@ export default function AdminExpensesPage() {
                   <button
                     type="button"
                     id="btn-select-upi"
+                    ref={paymentUpiBtnRef}
                     onClick={() => setTypeInput('upi')}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        setTypeInput('upi');
+                        notesInputRef.current?.focus();
+                      } else if (e.key === 'ArrowLeft') {
+                        e.preventDefault();
+                        setTypeInput('cash');
+                        paymentCashBtnRef.current?.focus();
+                      }
+                    }}
                     className={`p-3 rounded-lg border flex items-center justify-center gap-2 font-medium transition-all ${
                       typeInput === 'upi'
                         ? 'border-blue-600 bg-blue-50 text-blue-800 ring-2 ring-blue-500/20'
@@ -637,10 +723,17 @@ export default function AdminExpensesPage() {
                 </label>
                 <textarea
                   id="input-expense-notes"
+                  ref={notesInputRef}
                   rows={3}
                   placeholder="e.g., Tea/Snacks, Packing bags, Transport, Cleaning supplies..."
                   value={notesInput}
                   onChange={(e) => setNotesInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      saveExpenseBtnRef.current?.focus();
+                    }
+                  }}
                   className="textarea-base text-sm w-full mt-1"
                 />
               </div>
@@ -660,6 +753,7 @@ export default function AdminExpensesPage() {
                 <button
                   type="submit"
                   id="btn-submit-expense"
+                  ref={saveExpenseBtnRef}
                   disabled={submitting}
                   className="btn-base btn-primary px-5 py-2 text-sm rounded-lg flex items-center gap-2"
                 >

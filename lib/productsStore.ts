@@ -6,6 +6,7 @@ export interface CreateProductInput {
   category_id?: string | null;
   barcode?: string | null;
   mrp: number;
+  discount?: number;
   selling_price: number;
   retail_quantity: number;
   warehouse_quantity: number;
@@ -19,6 +20,7 @@ export interface UpdateProductInput {
   category_id?: string | null;
   barcode?: string | null;
   mrp?: number;
+  discount?: number;
   selling_price?: number;
   retail_quantity?: number;
   warehouse_quantity?: number;
@@ -115,6 +117,7 @@ export async function createProduct(input: CreateProductInput): Promise<StoreRes
       category_id: string | null;
       barcode: string | null;
       mrp: number;
+      discount: number;
       selling_price: number;
       retail_quantity: number;
       warehouse_quantity: number;
@@ -126,6 +129,7 @@ export async function createProduct(input: CreateProductInput): Promise<StoreRes
       category_id: input.category_id ? input.category_id : null,
       barcode: input.barcode && input.barcode.trim() !== '' ? input.barcode.trim() : null,
       mrp: Number(input.mrp) || 0,
+      discount: Number(input.discount) || 0,
       selling_price: Number(input.selling_price) || 0,
       retail_quantity: Number(input.retail_quantity) || 0,
       warehouse_quantity: Number(input.warehouse_quantity) || 0,
@@ -171,6 +175,7 @@ export async function updateProduct(id: string, input: UpdateProductInput): Prom
     if (input.category_id !== undefined) payload.category_id = input.category_id || null;
     if (input.barcode !== undefined) payload.barcode = input.barcode ? input.barcode.trim() : null;
     if (input.mrp !== undefined) payload.mrp = Number(input.mrp) || 0;
+    if (input.discount !== undefined) payload.discount = Number(input.discount) || 0;
     if (input.selling_price !== undefined) payload.selling_price = Number(input.selling_price) || 0;
     if (input.retail_quantity !== undefined) payload.retail_quantity = Number(input.retail_quantity) || 0;
     if (input.warehouse_quantity !== undefined) payload.warehouse_quantity = Number(input.warehouse_quantity) || 0;

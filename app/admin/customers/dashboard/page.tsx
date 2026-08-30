@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import {
   Users,
@@ -30,11 +30,17 @@ import {
 import type { TransactionCalculation } from '@/lib/types';
 
 export default function AdminCustomersDashboardPage() {
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [customers, setCustomers] = useState<CustomerWithStats[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Directly focus the search bar input on page load
+  useEffect(() => {
+    searchInputRef.current?.focus();
+  }, []);
 
   // Quick Add Transaction Modal State
   const [selectedCustomerForTx, setSelectedCustomerForTx] = useState<CustomerWithStats | null>(null);
@@ -274,14 +280,16 @@ export default function AdminCustomersDashboardPage() {
             {/* Search Bar (Search Customer Name) */}
             <div id="customers-search-card" className="card-base p-4">
               <div className="relative w-full sm:w-96">
-                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none z-10" />
                 <input
+                  ref={searchInputRef}
                   id="search-customer-name-input"
                   type="text"
+                  autoFocus
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search customer name (e.g. Rahul, Priya)..."
-                  className="input-base pl-9 pr-8 w-full"
+                  className="input-base input-with-icon-left pr-8 w-full"
                 />
                 {searchQuery && (
                   <button
@@ -628,7 +636,7 @@ export default function AdminCustomersDashboardPage() {
                     Amount (₹) <span className="text-danger">*</span>
                   </label>
                   <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary font-bold">
+                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-secondary font-bold pointer-events-none z-10">
                       ₹
                     </span>
                     <input
@@ -639,7 +647,7 @@ export default function AdminCustomersDashboardPage() {
                       value={txAmount}
                       onChange={(e) => setTxAmount(e.target.value)}
                       placeholder="0.00"
-                      className="input-base pl-8 font-mono"
+                      className="input-base input-with-icon-left font-mono w-full"
                       disabled={isSubmittingTx}
                       autoFocus
                       required

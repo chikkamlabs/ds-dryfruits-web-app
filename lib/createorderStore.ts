@@ -13,6 +13,7 @@ export interface CreateBillItemInput {
   product_id: string;
   quantity: number;
   mrp: number;
+  discount?: number;
   selling_price: number;
   row_total: number;
 }
@@ -90,6 +91,7 @@ export async function createBill(input: CreateBillInput): Promise<StoreResponse<
       product_id: item.product_id,
       quantity: Number(item.quantity) || 1,
       mrp: Number(item.mrp) || 0,
+      discount: Number(item.discount) || 0,
       selling_price: Number(item.selling_price) || 0,
       row_total: Number(item.row_total) || 0,
     }));

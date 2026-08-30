@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import {
   Truck,
@@ -25,10 +25,16 @@ import {
 } from '@/lib/distributorsStore';
 
 export default function AdminDistributorsDashboardPage() {
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [distributors, setDistributors] = useState<DistributorWithStats[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Directly focus the search bar input on page load
+  useEffect(() => {
+    searchInputRef.current?.focus();
+  }, []);
 
   // Add Distributor Modal state
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -36,6 +42,21 @@ export default function AdminDistributorsDashboardPage() {
   const [newLocation, setNewLocation] = useState('');
   const [newNotes, setNewNotes] = useState('');
   const [isCreating, setIsCreating] = useState(false);
+
+  // Input refs for modal keyboard navigation
+  const newNameRef = useRef<HTMLInputElement | null>(null);
+  const newLocationRef = useRef<HTMLInputElement | null>(null);
+  const newNotesRef = useRef<HTMLTextAreaElement | null>(null);
+  const submitCreateBtnRef = useRef<HTMLButtonElement | null>(null);
+
+  // Auto-focus distributor name when modal opens
+  useEffect(() => {
+    if (isAddModalOpen) {
+      setTimeout(() => {
+        newNameRef.current?.focus();
+      }, 50);
+    }
+  }, [isAddModalOpen]);
 
   // Status feedback
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -119,8 +140,8 @@ export default function AdminDistributorsDashboardPage() {
   );
 
   // Handle Add Distributor Submit
-  const handleCreateSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleCreateSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (!newName.trim()) {
       setErrorMessage('Distributor Name is required.');
       return;
@@ -152,7 +173,7 @@ export default function AdminDistributorsDashboardPage() {
   };
 
   return (
-    <div id="admin-distributors-layout" className="flex flex-col min-h-screen bg-bg-app">
+    <div id="admin-distributors-layout" className="flex flex-col h-screen overflow-hidden bg-bg-app">
       {/* Top Navigation Bar */}
       <AdminHeader
         onToggleSidebar={() => setIsSidebarOpen(true)}
@@ -321,12 +342,14 @@ export default function AdminDistributorsDashboardPage() {
                 <div className="sm:col-span-8 md:col-span-9 relative">
                   <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none z-10" />
                   <input
+                    ref={searchInputRef}
                     id="search-distributors-input"
                     type="text"
+                    autoFocus
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Search distributors by name, ID code (e.g. distri-101), or location..."
-                    className="input-base !pl-10 w-full"
+                    className="input-base input-with-icon-left w-full"
                   />
                   {searchQuery && (
                     <button
@@ -551,13 +574,22 @@ export default function AdminDistributorsDashboardPage() {
                   </label>
                   <input
                     id="modal-distributor-name"
+                    ref={newNameRef}
                     type="text"
                     value={newName}
                     onChange={(e) => setNewName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        newLocationRef.current?.focus();
+                      } else if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        newLocationRef.current?.focus();
+                      }
+                    }}
                     placeholder="e.g. Royal Dry Fruits Wholesalers"
                     className="input-base"
                     required
-                    autoFocus
                   />
                 </div>
 
@@ -568,9 +600,22 @@ export default function AdminDistributorsDashboardPage() {
                   </label>
                   <input
                     id="modal-distributor-location"
+                    ref={newLocationRef}
                     type="text"
                     value={newLocation}
                     onChange={(e) => setNewLocation(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        newNotesRef.current?.focus();
+                      } else if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        newNameRef.current?.focus();
+                      } else if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        newNotesRef.current?.focus();
+                      }
+                    }}
                     placeholder="e.g. APMC Market, Vashi, Navi Mumbai"
                     className="input-base"
                   />
@@ -583,8 +628,21 @@ export default function AdminDistributorsDashboardPage() {
                   </label>
                   <textarea
                     id="modal-distributor-notes"
+                    ref={newNotesRef}
                     value={newNotes}
                     onChange={(e) => setNewNotes(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleCreateSubmit();
+                      } else if (e.key === 'ArrowUp' && (e.target as HTMLTextAreaElement).selectionStart === 0) {
+                        e.preventDefault();
+                        newLocationRef.current?.focus();
+                      } else if (e.key === 'ArrowDown' && (e.target as HTMLTextAreaElement).selectionStart === newNotes.length) {
+                        e.preventDefault();
+                        submitCreateBtnRef.current?.focus();
+                      }
+                    }}
                     placeholder="e.g. Contact Person: Rajesh Bhai (+91 98765 43210), delivers on Tuesdays..."
                     className="textarea-base min-h-[5rem]"
                   />
@@ -603,9 +661,10 @@ export default function AdminDistributorsDashboardPage() {
 
                 <button
                   id="submit-create-distributor-btn"
+                  ref={submitCreateBtnRef}
                   type="submit"
                   disabled={isCreating || !newName.trim()}
-                  className="btn-base btn-primary layout-flex-start gap-2"
+                  className="btn-base btn-primary layout-flex-start gap-2 cursor-pointer"
                 >
                   {isCreating ? (
                     <>
