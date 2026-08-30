@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, Suspense } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   ArrowLeft,
   ShoppingBag,
@@ -23,6 +23,7 @@ import AdminSidebar from '@/app/admin/sidebar/page';
 import { getPurchaseById, type PurchaseWithDetails } from '@/lib/purchasesStore';
 
 function OpenPurchaseContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const purchaseIdParam = searchParams.get('id');
 
@@ -30,6 +31,18 @@ function OpenPurchaseContent() {
   const [purchase, setPurchase] = useState<PurchaseWithDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // ESC key navigation to return to purchases dashboard
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        router.push('/admin/purchases/dashboard');
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [router]);
 
   useEffect(() => {
     let isMounted = true;

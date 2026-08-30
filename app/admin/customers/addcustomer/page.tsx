@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -28,6 +28,64 @@ export default function AdminAddCustomerPage() {
   const [address, setAddress] = useState('');
   const [status, setStatus] = useState<CustomerStatus>('active');
   const [notes, setNotes] = useState('');
+
+  // Field refs for sequential keyboard navigation
+  const nameRef = useRef<HTMLInputElement | null>(null);
+  const mobileRef = useRef<HTMLInputElement | null>(null);
+  const pointsRef = useRef<HTMLInputElement | null>(null);
+  const creditRef = useRef<HTMLInputElement | null>(null);
+  const locationRef = useRef<HTMLInputElement | null>(null);
+  const addressRef = useRef<HTMLTextAreaElement | null>(null);
+  const statusRef = useRef<HTMLSelectElement | null>(null);
+  const notesRef = useRef<HTMLTextAreaElement | null>(null);
+  const saveBtnRef = useRef<HTMLButtonElement | null>(null);
+
+  const fieldRefs = [
+    nameRef,
+    mobileRef,
+    pointsRef,
+    creditRef,
+    locationRef,
+    addressRef,
+    statusRef,
+    notesRef,
+    saveBtnRef,
+  ];
+
+  // Auto-focus Full Name when page opens
+  useEffect(() => {
+    nameRef.current?.focus();
+  }, []);
+
+  // ESC key navigation to return to customers dashboard
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        router.push('/admin/customers/dashboard');
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [router]);
+
+  const handleFieldKeyDown = (e: React.KeyboardEvent, index: number) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      if (index === fieldRefs.length - 1) return; // On submit button, proceed with form submit
+      e.preventDefault();
+      fieldRefs[index + 1]?.current?.focus();
+    } else if (e.key === 'ArrowDown') {
+      if (index < fieldRefs.length - 1) {
+        e.preventDefault();
+        fieldRefs[index + 1]?.current?.focus();
+      }
+    } else if (e.key === 'ArrowUp') {
+      if (index > 0) {
+        e.preventDefault();
+        fieldRefs[index - 1]?.current?.focus();
+      }
+    }
+  };
 
   // UI state
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -181,12 +239,14 @@ export default function AdminAddCustomerPage() {
                   </label>
                   <input
                     id="customer-name-input"
+                    ref={nameRef}
                     type="text"
                     value={name}
                     onChange={(e) => {
                       setName(e.target.value);
                       if (nameError) setNameError(null);
                     }}
+                    onKeyDown={(e) => handleFieldKeyDown(e, 0)}
                     placeholder="e.g. Ramesh Kumar, Sunita Verma"
                     className={`input-base ${nameError ? 'input-error' : ''}`}
                     disabled={isSubmitting}
@@ -209,9 +269,11 @@ export default function AdminAddCustomerPage() {
                   </label>
                   <input
                     id="customer-mobile-input"
+                    ref={mobileRef}
                     type="tel"
                     value={mobile}
                     onChange={(e) => setMobile(e.target.value)}
+                    onKeyDown={(e) => handleFieldKeyDown(e, 1)}
                     placeholder="e.g. 9876543210"
                     className="input-base font-mono"
                     disabled={isSubmitting}
@@ -230,11 +292,13 @@ export default function AdminAddCustomerPage() {
                     </label>
                     <input
                       id="customer-points-input"
+                      ref={pointsRef}
                       type="number"
                       step="0.01"
                       min="0"
                       value={points}
                       onChange={(e) => setPoints(e.target.value)}
+                      onKeyDown={(e) => handleFieldKeyDown(e, 2)}
                       placeholder="0.00"
                       className="input-base font-mono"
                       disabled={isSubmitting}
@@ -251,11 +315,13 @@ export default function AdminAddCustomerPage() {
                     </label>
                     <input
                       id="customer-credit-input"
+                      ref={creditRef}
                       type="number"
                       step="0.01"
                       min="0"
                       value={credit}
                       onChange={(e) => setCredit(e.target.value)}
+                      onKeyDown={(e) => handleFieldKeyDown(e, 3)}
                       placeholder="0.00"
                       className="input-base font-mono"
                       disabled={isSubmitting}
@@ -273,9 +339,11 @@ export default function AdminAddCustomerPage() {
                   </label>
                   <input
                     id="customer-location-input"
+                    ref={locationRef}
                     type="text"
                     value={location}
                     onChange={(e) => setLocation(e.target.value)}
+                    onKeyDown={(e) => handleFieldKeyDown(e, 4)}
                     placeholder="e.g. Hyderabad, Banjara Hills, Secunderabad"
                     className="input-base"
                     disabled={isSubmitting}
@@ -292,9 +360,11 @@ export default function AdminAddCustomerPage() {
                   </label>
                   <textarea
                     id="customer-address-input"
+                    ref={addressRef}
                     rows={2}
                     value={address}
                     onChange={(e) => setAddress(e.target.value)}
+                    onKeyDown={(e) => handleFieldKeyDown(e, 5)}
                     placeholder="Flat/Shop number, Street, City, Pincode"
                     className="textarea-base"
                     disabled={isSubmitting}
@@ -308,8 +378,10 @@ export default function AdminAddCustomerPage() {
                   </label>
                   <select
                     id="customer-status-select"
+                    ref={statusRef}
                     value={status}
                     onChange={(e) => setStatus(e.target.value as CustomerStatus)}
+                    onKeyDown={(e) => handleFieldKeyDown(e, 6)}
                     className="select-base"
                     disabled={isSubmitting}
                   >
@@ -325,9 +397,11 @@ export default function AdminAddCustomerPage() {
                   </label>
                   <textarea
                     id="customer-notes-input"
+                    ref={notesRef}
                     rows={2}
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
+                    onKeyDown={(e) => handleFieldKeyDown(e, 7)}
                     placeholder="e.g. Preferred dry fruits packaging, VIP customer, festival orders contact"
                     className="textarea-base"
                     disabled={isSubmitting}
@@ -346,9 +420,11 @@ export default function AdminAddCustomerPage() {
 
                   <button
                     id="save-customer-submit-btn"
+                    ref={saveBtnRef}
                     type="submit"
+                    onKeyDown={(e) => handleFieldKeyDown(e, 8)}
                     disabled={isSubmitting}
-                    className="btn-base btn-primary btn-md"
+                    className="btn-base btn-primary btn-md cursor-pointer"
                   >
                     <Save className="w-4 h-4" />
                     <span>{isSubmitting ? 'Saving Customer...' : 'Save Customer'}</span>

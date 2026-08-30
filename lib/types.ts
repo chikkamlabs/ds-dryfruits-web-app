@@ -70,6 +70,7 @@ export interface Product {
   name: string;
   category_id: string | null;
   mrp: number;
+  discount: number;
   selling_price: number;
   retail_quantity: number;
   warehouse_quantity: number;
@@ -124,6 +125,7 @@ export interface BillItem {
   product_id: string;
   quantity: number;
   mrp: number;
+  discount: number;
   selling_price: number;
   row_total: number;
   created_at: string;

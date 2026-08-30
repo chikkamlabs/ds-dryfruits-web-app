@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import {
   Tags,
@@ -19,12 +19,18 @@ import { getCategories } from '@/lib/categoriesStore';
 import type { Category } from '@/lib/types';
 
 export default function AdminCategoriesDashboardPage() {
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
+
+  // Directly focus the search bar input on page load
+  useEffect(() => {
+    searchInputRef.current?.focus();
+  }, []);
 
   const loadCategories = async () => {
     setIsLoading(true);
@@ -216,14 +222,16 @@ export default function AdminCategoriesDashboardPage() {
               <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
                 {/* Search Bar (Name and Category ID) */}
                 <div className="relative w-full sm:w-80 md:w-96">
-                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
+                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none z-10" />
                   <input
+                    ref={searchInputRef}
                     id="search-category-input"
                     type="text"
+                    autoFocus
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Search category name or ID (e.g. cat-101)..."
-                    className="input-base pl-9 pr-3"
+                    className="input-base input-with-icon-left pr-3 w-full"
                   />
                   {searchQuery && (
                     <button

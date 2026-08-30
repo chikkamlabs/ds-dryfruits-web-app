@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -42,10 +42,67 @@ function OpenCustomerContent() {
   const [status, setStatus] = useState<CustomerStatus>('active');
   const [notes, setNotes] = useState('');
 
+  // Field refs for sequential keyboard navigation
+  const nameRef = useRef<HTMLInputElement | null>(null);
+  const mobileRef = useRef<HTMLInputElement | null>(null);
+  const pointsRef = useRef<HTMLInputElement | null>(null);
+  const creditRef = useRef<HTMLInputElement | null>(null);
+  const locationRef = useRef<HTMLInputElement | null>(null);
+  const addressRef = useRef<HTMLTextAreaElement | null>(null);
+  const statusRef = useRef<HTMLSelectElement | null>(null);
+  const notesRef = useRef<HTMLTextAreaElement | null>(null);
+  const saveBtnRef = useRef<HTMLButtonElement | null>(null);
+
+  const fieldRefs = [
+    nameRef,
+    mobileRef,
+    pointsRef,
+    creditRef,
+    locationRef,
+    addressRef,
+    statusRef,
+    notesRef,
+    saveBtnRef,
+  ];
+
+  const handleFieldKeyDown = (e: React.KeyboardEvent, index: number) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      if (index === fieldRefs.length - 1) return; // On submit button, let form submit
+      e.preventDefault();
+      fieldRefs[index + 1]?.current?.focus();
+    } else if (e.key === 'ArrowDown') {
+      if (index < fieldRefs.length - 1) {
+        e.preventDefault();
+        fieldRefs[index + 1]?.current?.focus();
+      }
+    } else if (e.key === 'ArrowUp') {
+      if (index > 0) {
+        e.preventDefault();
+        fieldRefs[index - 1]?.current?.focus();
+      }
+    }
+  };
+
   // Messages & Errors
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [nameError, setNameError] = useState<string | null>(null);
+
+  // ESC key navigation to return to customers dashboard
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (showDeleteConfirm) {
+          setShowDeleteConfirm(false);
+          return;
+        }
+        e.preventDefault();
+        router.push('/admin/customers/dashboard');
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [router, showDeleteConfirm]);
 
   useEffect(() => {
     let isMounted = true;
@@ -75,6 +132,9 @@ function OpenCustomerContent() {
         setAddress(data.address || '');
         setStatus(data.status || 'active');
         setNotes(data.notes || '');
+        setTimeout(() => {
+          nameRef.current?.focus();
+        }, 100);
       } else {
         setErrorMessage('Customer not found in database.');
       }
@@ -308,12 +368,14 @@ function OpenCustomerContent() {
                       </label>
                       <input
                         id="edit-customer-name-input"
+                        ref={nameRef}
                         type="text"
                         value={name}
                         onChange={(e) => {
                           setName(e.target.value);
                           if (nameError) setNameError(null);
                         }}
+                        onKeyDown={(e) => handleFieldKeyDown(e, 0)}
                         className={`input-base ${nameError ? 'input-error' : ''}`}
                         disabled={isSubmitting}
                       />
@@ -331,9 +393,11 @@ function OpenCustomerContent() {
                       </label>
                       <input
                         id="edit-customer-mobile-input"
+                        ref={mobileRef}
                         type="tel"
                         value={mobile}
                         onChange={(e) => setMobile(e.target.value)}
+                        onKeyDown={(e) => handleFieldKeyDown(e, 1)}
                         className="input-base font-mono"
                         disabled={isSubmitting}
                       />
@@ -348,11 +412,13 @@ function OpenCustomerContent() {
                         </label>
                         <input
                           id="edit-customer-points-input"
+                          ref={pointsRef}
                           type="number"
                           step="0.01"
                           min="0"
                           value={points}
                           onChange={(e) => setPoints(e.target.value)}
+                          onKeyDown={(e) => handleFieldKeyDown(e, 2)}
                           className="input-base font-mono"
                           disabled={isSubmitting}
                         />
@@ -365,11 +431,13 @@ function OpenCustomerContent() {
                         </label>
                         <input
                           id="edit-customer-credit-input"
+                          ref={creditRef}
                           type="number"
                           step="0.01"
                           min="0"
                           value={credit}
                           onChange={(e) => setCredit(e.target.value)}
+                          onKeyDown={(e) => handleFieldKeyDown(e, 3)}
                           className="input-base font-mono font-semibold text-accent"
                           disabled={isSubmitting}
                         />
@@ -383,9 +451,11 @@ function OpenCustomerContent() {
                       </label>
                       <input
                         id="edit-customer-location-input"
+                        ref={locationRef}
                         type="text"
                         value={location}
                         onChange={(e) => setLocation(e.target.value)}
+                        onKeyDown={(e) => handleFieldKeyDown(e, 4)}
                         className="input-base"
                         disabled={isSubmitting}
                       />
@@ -398,9 +468,11 @@ function OpenCustomerContent() {
                       </label>
                       <textarea
                         id="edit-customer-address-input"
+                        ref={addressRef}
                         rows={2}
                         value={address}
                         onChange={(e) => setAddress(e.target.value)}
+                        onKeyDown={(e) => handleFieldKeyDown(e, 5)}
                         className="textarea-base"
                         disabled={isSubmitting}
                       />
@@ -413,8 +485,10 @@ function OpenCustomerContent() {
                       </label>
                       <select
                         id="edit-customer-status-select"
+                        ref={statusRef}
                         value={status}
                         onChange={(e) => setStatus(e.target.value as CustomerStatus)}
+                        onKeyDown={(e) => handleFieldKeyDown(e, 6)}
                         className="select-base"
                         disabled={isSubmitting}
                       >
@@ -430,9 +504,11 @@ function OpenCustomerContent() {
                       </label>
                       <textarea
                         id="edit-customer-notes-input"
+                        ref={notesRef}
                         rows={2}
                         value={notes}
                         onChange={(e) => setNotes(e.target.value)}
+                        onKeyDown={(e) => handleFieldKeyDown(e, 7)}
                         className="textarea-base"
                         disabled={isSubmitting}
                       />
@@ -490,9 +566,11 @@ function OpenCustomerContent() {
 
                       <button
                         id="save-changes-customer-btn"
+                        ref={saveBtnRef}
                         type="submit"
+                        onKeyDown={(e) => handleFieldKeyDown(e, 8)}
                         disabled={isSubmitting}
-                        className="btn-base btn-primary btn-md"
+                        className="btn-base btn-primary btn-md cursor-pointer"
                       >
                         <Save className="w-4 h-4" />
                         <span>{isSubmitting ? 'Saving Changes...' : 'Save Changes'}</span>

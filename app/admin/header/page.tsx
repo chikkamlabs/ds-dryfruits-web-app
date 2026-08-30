@@ -9,7 +9,7 @@ import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 // Header component for Admin
 export default function AdminHeader(props: any) {
   const router = useRouter();
-  const onToggleSidebar = props?.onToggleSidebar as (() => void) | undefined;
+  const onToggleSidebar = (props?.onToggleSidebar || props?.onOpenSidebar) as (() => void) | undefined;
 
   const handleLogout = async () => {
     try {

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import {
   Boxes,
@@ -22,6 +22,7 @@ import { getCategories } from '@/lib/categoriesStore';
 import type { Product, Category } from '@/lib/types';
 
 export default function AdminProductsDashboardPage() {
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -36,6 +37,11 @@ export default function AdminProductsDashboardPage() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [sortBy, setSortBy] = useState<'created_at' | 'name' | 'mrp' | 'retail_quantity' | 'warehouse_quantity'>('created_at');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+
+  // Directly focus the search bar input on page load
+  useEffect(() => {
+    searchInputRef.current?.focus();
+  }, []);
 
   const loadData = async () => {
     setIsLoading(true);
@@ -195,9 +201,10 @@ export default function AdminProductsDashboardPage() {
   }, [products]);
 
   return (
-    <div id="admin-products-layout" className="flex flex-col min-h-screen bg-bg-app">
+    <div id="admin-products-layout" className="flex flex-col h-screen overflow-hidden bg-bg-app">
       {/* Top Navigation Bar */}
       <AdminHeader
+        onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
         onOpenSidebar={() => setIsSidebarOpen(true)}
       />
 
@@ -214,9 +221,16 @@ export default function AdminProductsDashboardPage() {
           className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8"
         >
           <div className="layout-responsive-container max-w-7xl mx-auto space-y-6">
-            {/* Header Section with Page Title and Add Product CTA */}
+            {/* Header Section with Breadcrumbs, Page Title and Add Product CTA */}
             <div id="products-header-section" className="layout-flex-between flex-wrap gap-4">
               <div>
+                <div className="breadcrumb-nav mb-1">
+                  <Link href="/admin/dashboard" className="breadcrumb-item">
+                    Home
+                  </Link>
+                  <span>/</span>
+                  <span className="breadcrumb-item-active">Products</span>
+                </div>
                 <h1 id="products-page-title" className="text-page-title font-bold">
                   Products Management
                 </h1>
@@ -342,12 +356,14 @@ export default function AdminProductsDashboardPage() {
                   <div className="relative">
                     <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none z-10" />
                     <input
+                      ref={searchInputRef}
                       id="search-product-input"
                       type="text"
+                      autoFocus
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       placeholder="Search by ID (e.g. prod-101), Name, Barcode..."
-                      className="input-base !pl-10 w-full"
+                      className="input-base input-with-icon-left w-full"
                     />
                   </div>
                 </div>

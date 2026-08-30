@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useId } from 'react';
+import React, { useState, useEffect, useMemo, useId, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -58,6 +58,19 @@ export default function AdminAddPurchasePage() {
   const [stagedRetailQty, setStagedRetailQty] = useState<string>('0');
   const [stagedWarehouseQty, setStagedWarehouseQty] = useState<string>('0');
 
+  // Keyboard navigation index states
+  const [selectedDistributorIndex, setSelectedDistributorIndex] = useState(0);
+  const [selectedProductIndex, setSelectedProductIndex] = useState(0);
+
+  // Input & Button refs for keyboard navigation
+  const distributorSearchInputRef = useRef<HTMLInputElement | null>(null);
+  const productSearchInputRef = useRef<HTMLInputElement | null>(null);
+  const retailQtyInputRef = useRef<HTMLInputElement | null>(null);
+  const warehouseQtyInputRef = useRef<HTMLInputElement | null>(null);
+  const confirmAddItemBtnRef = useRef<HTMLButtonElement | null>(null);
+  const purchaseNotesInputRef = useRef<HTMLTextAreaElement | null>(null);
+  const savePurchaseBtnRef = useRef<HTMLButtonElement | null>(null);
+
   // Purchase items list
   const [purchaseItems, setPurchaseItems] = useState<PurchaseLineItemInput[]>([]);
   const [purchaseNotes, setPurchaseNotes] = useState('');
@@ -66,6 +79,27 @@ export default function AdminAddPurchasePage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  // Auto-focus distributor search on open
+  useEffect(() => {
+    distributorSearchInputRef.current?.focus();
+  }, []);
+
+  // ESC key navigation to return to purchases dashboard
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (isScannerOpen) {
+          setIsScannerOpen(false);
+          return;
+        }
+        e.preventDefault();
+        router.push('/admin/purchases/dashboard');
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [router, isScannerOpen]);
 
   // Load initial data
   useEffect(() => {
@@ -163,6 +197,14 @@ export default function AdminAddPurchasePage() {
     }
   };
 
+  // Select distributor and advance focus to product search
+  const selectDistributor = (dist: Distributor) => {
+    setSelectedDistributor(dist);
+    setTimeout(() => {
+      productSearchInputRef.current?.focus();
+    }, 100);
+  };
+
   // Handle Barcode Scan match
   const handleBarcodeScanned = (scannedBarcode: string) => {
     setIsScannerOpen(false);
@@ -180,15 +222,19 @@ export default function AdminAddPurchasePage() {
     }
   };
 
-  // Select a product to enter quantities
+  // Select a product to enter quantities and focus retail quantity
   const selectProductForStaging = (product: Product) => {
     setStagedProduct(product);
     setStagedRetailQty('0');
     setStagedWarehouseQty('0');
     setErrorMessage(null);
+    setTimeout(() => {
+      retailQtyInputRef.current?.focus();
+      retailQtyInputRef.current?.select();
+    }, 100);
   };
 
-  // Add staged product to purchaseItems list
+  // Add staged product to purchaseItems list and focus purchase notes
   const handleAddItemToPurchase = () => {
     if (!stagedProduct) {
       setErrorMessage('Please select a product first.');
@@ -247,6 +293,11 @@ export default function AdminAddPurchasePage() {
     setStagedWarehouseQty('0');
     setProductSearch('');
     setErrorMessage(null);
+
+    // After adding item, set focus to notes
+    setTimeout(() => {
+      purchaseNotesInputRef.current?.focus();
+    }, 100);
   };
 
   // Remove item from purchase list
@@ -451,14 +502,40 @@ export default function AdminAddPurchasePage() {
                         Search Distributor by Name or Code
                       </label>
                       <div className="relative">
-                        <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
+                        <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none z-10" />
                         <input
                           id="distributor-search-input"
+                          ref={distributorSearchInputRef}
                           type="text"
                           value={distributorSearch}
-                          onChange={(e) => setDistributorSearch(e.target.value)}
+                          onChange={(e) => {
+                            setDistributorSearch(e.target.value);
+                            setSelectedDistributorIndex(0);
+                          }}
+                          onKeyDown={(e) => {
+                            if (filteredDistributors.length === 0) return;
+                            if (e.key === 'ArrowDown') {
+                              e.preventDefault();
+                              const nextIdx = (selectedDistributorIndex + 1) % filteredDistributors.length;
+                              setSelectedDistributorIndex(nextIdx);
+                              const el = document.getElementById(`distributor-option-${filteredDistributors[nextIdx].distributor_code}`);
+                              el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                            } else if (e.key === 'ArrowUp') {
+                              e.preventDefault();
+                              const prevIdx = (selectedDistributorIndex - 1 + filteredDistributors.length) % filteredDistributors.length;
+                              setSelectedDistributorIndex(prevIdx);
+                              const el = document.getElementById(`distributor-option-${filteredDistributors[prevIdx].distributor_code}`);
+                              el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                            } else if (e.key === 'Enter') {
+                              e.preventDefault();
+                              const chosen = filteredDistributors[selectedDistributorIndex] || filteredDistributors[0];
+                              if (chosen) {
+                                selectDistributor(chosen);
+                              }
+                            }
+                          }}
                           placeholder="Type distributor name (e.g. Royal Dry Fruits, distri-101)..."
-                          className="input-base pl-9 w-full"
+                          className="input-base !pl-10 w-full"
                         />
                       </div>
                     </div>
@@ -537,36 +614,48 @@ export default function AdminAddPurchasePage() {
                       </div>
                     ) : (
                       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 max-h-48 overflow-y-auto pr-1">
-                        {filteredDistributors.map((dist) => (
-                          <div
-                            key={dist.id}
-                            id={`distributor-option-${dist.distributor_code}`}
-                            onClick={() => setSelectedDistributor(dist)}
-                            className="p-3 rounded-lg border border-border bg-surface hover:border-primary hover:bg-primary-light/20 cursor-pointer transition-all flex flex-col justify-between"
-                          >
-                            <div>
-                              <div className="layout-flex-between">
-                                <span className="font-semibold text-text-primary text-small">
-                                  {dist.name}
-                                </span>
-                                <span className="font-mono text-caption text-text-muted">
-                                  {dist.distributor_code}
-                                </span>
-                              </div>
-                              {dist.location && (
-                                <p className="text-caption text-text-secondary mt-1 truncate">
-                                  {dist.location}
-                                </p>
-                              )}
-                            </div>
-                            <button
-                              type="button"
-                              className="btn-base btn-outline btn-sm w-full mt-2 text-xs py-1"
+                        {filteredDistributors.map((dist, idx) => {
+                          const isSelected = idx === selectedDistributorIndex;
+                          return (
+                            <div
+                              key={dist.id}
+                              id={`distributor-option-${dist.distributor_code}`}
+                              onClick={() => {
+                                setSelectedDistributorIndex(idx);
+                                selectDistributor(dist);
+                              }}
+                              className={`p-3 rounded-lg border cursor-pointer transition-all flex flex-col justify-between ${
+                                isSelected
+                                  ? 'border-primary bg-primary-light/40 ring-2 ring-primary'
+                                  : 'border-border bg-surface hover:border-primary hover:bg-primary-light/20'
+                              }`}
                             >
-                              Select
-                            </button>
-                          </div>
-                        ))}
+                              <div>
+                                <div className="layout-flex-between">
+                                  <span className="font-semibold text-text-primary text-small">
+                                    {dist.name}
+                                  </span>
+                                  <span className="font-mono text-caption text-text-muted">
+                                    {dist.distributor_code}
+                                  </span>
+                                </div>
+                                {dist.location && (
+                                  <p className="text-caption text-text-secondary mt-1 truncate">
+                                    {dist.location}
+                                  </p>
+                                )}
+                              </div>
+                              <button
+                                type="button"
+                                className={`btn-base btn-sm w-full mt-2 text-xs py-1 ${
+                                  isSelected ? 'btn-primary' : 'btn-outline'
+                                }`}
+                              >
+                                {isSelected ? 'Selected (Press Enter)' : 'Select'}
+                              </button>
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
@@ -609,14 +698,40 @@ export default function AdminAddPurchasePage() {
                     Search Product (Name, ID, Barcode, Category)
                   </label>
                   <div className="relative">
-                    <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
+                    <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none z-10" />
                     <input
                       id="product-search-input"
+                      ref={productSearchInputRef}
                       type="text"
                       value={productSearch}
-                      onChange={(e) => setProductSearch(e.target.value)}
+                      onChange={(e) => {
+                        setProductSearch(e.target.value);
+                        setSelectedProductIndex(0);
+                      }}
+                      onKeyDown={(e) => {
+                        if (filteredProducts.length === 0) return;
+                        if (e.key === 'ArrowDown') {
+                          e.preventDefault();
+                          const nextIdx = (selectedProductIndex + 1) % filteredProducts.length;
+                          setSelectedProductIndex(nextIdx);
+                          const el = document.getElementById(`product-item-${filteredProducts[nextIdx].product_id}`);
+                          el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                        } else if (e.key === 'ArrowUp') {
+                          e.preventDefault();
+                          const prevIdx = (selectedProductIndex - 1 + filteredProducts.length) % filteredProducts.length;
+                          setSelectedProductIndex(prevIdx);
+                          const el = document.getElementById(`product-item-${filteredProducts[prevIdx].product_id}`);
+                          el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                        } else if (e.key === 'Enter') {
+                          e.preventDefault();
+                          const chosen = filteredProducts[selectedProductIndex] || filteredProducts[0];
+                          if (chosen) {
+                            selectProductForStaging(chosen);
+                          }
+                        }
+                      }}
                       placeholder="Type product name (e.g. California Almonds, prod-101)..."
-                      className="input-base pl-9 w-full"
+                      className="input-base !pl-10 w-full"
                     />
                   </div>
                 </div>
@@ -638,7 +753,8 @@ export default function AdminAddPurchasePage() {
                     Available Products:
                   </span>
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 max-h-56 overflow-y-auto pr-1">
-                    {filteredProducts.map((p) => {
+                    {filteredProducts.map((p, idx) => {
+                      const isSelected = idx === selectedProductIndex;
                       const catName = p.category_id
                         ? categoryMap.get(p.category_id) || 'Unassigned'
                         : 'Unassigned';
@@ -647,8 +763,15 @@ export default function AdminAddPurchasePage() {
                         <div
                           key={p.id}
                           id={`product-item-${p.product_id}`}
-                          onClick={() => selectProductForStaging(p)}
-                          className="p-3 rounded-lg border border-border bg-surface hover:border-secondary hover:bg-surface-hover cursor-pointer transition-all flex flex-col justify-between"
+                          onClick={() => {
+                            setSelectedProductIndex(idx);
+                            selectProductForStaging(p);
+                          }}
+                          className={`p-3 rounded-lg border cursor-pointer transition-all flex flex-col justify-between ${
+                            isSelected
+                              ? 'border-secondary bg-secondary-light/30 ring-2 ring-secondary'
+                              : 'border-border bg-surface hover:border-secondary hover:bg-surface-hover'
+                          }`}
                         >
                           <div>
                             <div className="layout-flex-between">
@@ -674,9 +797,11 @@ export default function AdminAddPurchasePage() {
 
                           <button
                             type="button"
-                            className="btn-base btn-secondary btn-sm w-full mt-2 text-xs py-1"
+                            className={`btn-base btn-sm w-full mt-2 text-xs py-1 ${
+                              isSelected ? 'btn-primary' : 'btn-secondary'
+                            }`}
                           >
-                            + Enter Quantity
+                            {isSelected ? '+ Enter Quantity (Enter)' : '+ Enter Quantity'}
                           </button>
                         </div>
                       );
@@ -742,11 +867,22 @@ export default function AdminAddPurchasePage() {
                       </label>
                       <input
                         id="staged-retail-qty-input"
+                        ref={retailQtyInputRef}
                         type="number"
                         min="0"
                         step="any"
                         value={stagedRetailQty}
                         onChange={(e) => setStagedRetailQty(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === 'ArrowRight') {
+                            e.preventDefault();
+                            warehouseQtyInputRef.current?.focus();
+                            warehouseQtyInputRef.current?.select();
+                          } else if (e.key === 'ArrowLeft') {
+                            e.preventDefault();
+                            productSearchInputRef.current?.focus();
+                          }
+                        }}
                         className="input-base font-semibold text-emerald-800"
                         placeholder="0"
                       />
@@ -763,11 +899,25 @@ export default function AdminAddPurchasePage() {
                       </label>
                       <input
                         id="staged-warehouse-qty-input"
+                        ref={warehouseQtyInputRef}
                         type="number"
                         min="0"
                         step="any"
                         value={stagedWarehouseQty}
                         onChange={(e) => setStagedWarehouseQty(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'ArrowLeft') {
+                            e.preventDefault();
+                            retailQtyInputRef.current?.focus();
+                            retailQtyInputRef.current?.select();
+                          } else if (e.key === 'ArrowRight') {
+                            e.preventDefault();
+                            confirmAddItemBtnRef.current?.focus();
+                          } else if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleAddItemToPurchase();
+                          }
+                        }}
                         className="input-base font-semibold text-amber-800"
                         placeholder="0"
                       />
@@ -792,9 +942,20 @@ export default function AdminAddPurchasePage() {
                     <div>
                       <button
                         id="confirm-add-item-btn"
+                        ref={confirmAddItemBtnRef}
                         type="button"
                         onClick={handleAddItemToPurchase}
-                        className="btn-base btn-primary w-full h-[2.375rem] layout-flex-center gap-1.5"
+                        onKeyDown={(e) => {
+                          if (e.key === 'ArrowLeft') {
+                            e.preventDefault();
+                            warehouseQtyInputRef.current?.focus();
+                            warehouseQtyInputRef.current?.select();
+                          } else if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleAddItemToPurchase();
+                          }
+                        }}
+                        className="btn-base btn-primary w-full h-[2.375rem] layout-flex-center gap-1.5 cursor-pointer"
                       >
                         <Plus className="w-4 h-4" />
                         <span>Add to Purchase</span>
@@ -920,9 +1081,16 @@ export default function AdminAddPurchasePage() {
                     </label>
                     <textarea
                       id="purchase-notes-input"
+                      ref={purchaseNotesInputRef}
                       value={purchaseNotes}
                       onChange={(e) => setPurchaseNotes(e.target.value)}
-                      placeholder="e.g. Invoice #INV-2026-889, Received via City Express Logistics..."
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          savePurchaseBtnRef.current?.focus();
+                        }
+                      }}
+                      placeholder="e.g. Invoice #INV-2026-889, Received via City Express Logistics... (Press Enter to move to Confirm & Save)"
                       className="textarea-base min-h-[4.5rem]"
                     />
                   </div>
@@ -969,10 +1137,17 @@ export default function AdminAddPurchasePage() {
 
                   <button
                     id="save-purchase-btn"
+                    ref={savePurchaseBtnRef}
                     type="button"
                     onClick={handleSubmitPurchase}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleSubmitPurchase();
+                      }
+                    }}
                     disabled={isSubmitting || purchaseItems.length === 0 || !selectedDistributor}
-                    className="btn-base btn-primary btn-lg layout-flex-start gap-2 shadow-md"
+                    className="btn-base btn-primary btn-lg layout-flex-start gap-2 shadow-md cursor-pointer"
                   >
                     {isSubmitting ? (
                       <>

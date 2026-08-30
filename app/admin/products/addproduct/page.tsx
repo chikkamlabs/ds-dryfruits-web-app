@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -27,26 +27,85 @@ export default function AddProductPage() {
   const [isScannerOpen, setIsScannerOpen] = useState(false);
 
   // Form Fields corresponding to Supabase products table:
-  // - name (TEXT, NOT NULL)
-  // - barcode (TEXT, UNIQUE, nullable)
-  // - category_id (UUID, references categories)
-  // - mrp (NUMERIC, NOT NULL, DEFAULT 0.00)
-  // - selling_price (NUMERIC, NOT NULL, DEFAULT 0.00)
-  // - retail_quantity (NUMERIC, NOT NULL, DEFAULT 0.000)
-  // - warehouse_quantity (NUMERIC, NOT NULL, DEFAULT 0.000)
-  // - low_selling_price (NUMERIC, DEFAULT 0.00) (Retail Low Alert threshold)
-  // - low_warehouse_quantity (NUMERIC, DEFAULT 0.000) (Warehouse Low Alert threshold)
-  // - status (public.product_status, DEFAULT 'active')
   const [name, setName] = useState('');
   const [barcode, setBarcode] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [mrp, setMrp] = useState<string>('');
+  const [discount, setDiscount] = useState<string>('0');
   const [sellingPrice, setSellingPrice] = useState<string>('');
   const [retailQuantity, setRetailQuantity] = useState<string>('0');
   const [warehouseQuantity, setWarehouseQuantity] = useState<string>('0');
   const [lowSellingPrice, setLowSellingPrice] = useState<string>('5');
   const [lowWarehouseQuantity, setLowWarehouseQuantity] = useState<string>('10');
   const [status, setStatus] = useState<ProductStatus>('active');
+
+  // Input Field References for keyboard navigation
+  const nameRef = useRef<HTMLInputElement | null>(null);
+  const categoryRef = useRef<HTMLSelectElement | null>(null);
+  const statusRef = useRef<HTMLSelectElement | null>(null);
+  const barcodeRef = useRef<HTMLInputElement | null>(null);
+  const mrpRef = useRef<HTMLInputElement | null>(null);
+  const discountRef = useRef<HTMLInputElement | null>(null);
+  const sellingPriceRef = useRef<HTMLInputElement | null>(null);
+  const retailQtyRef = useRef<HTMLInputElement | null>(null);
+  const warehouseQtyRef = useRef<HTMLInputElement | null>(null);
+  const lowRetailRef = useRef<HTMLInputElement | null>(null);
+  const lowWarehouseRef = useRef<HTMLInputElement | null>(null);
+  const submitBtnRef = useRef<HTMLButtonElement | null>(null);
+
+  const fieldRefs = [
+    nameRef,
+    categoryRef,
+    statusRef,
+    barcodeRef,
+    mrpRef,
+    discountRef,
+    sellingPriceRef,
+    retailQtyRef,
+    warehouseQtyRef,
+    lowRetailRef,
+    lowWarehouseRef,
+    submitBtnRef,
+  ];
+
+  // Auto-focus Product Name on mount
+  useEffect(() => {
+    nameRef.current?.focus();
+  }, []);
+
+  // ESC key navigation to return to products dashboard
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (isScannerOpen) {
+          setIsScannerOpen(false);
+          return;
+        }
+        e.preventDefault();
+        router.push('/admin/products/dashboard');
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [router, isScannerOpen]);
+
+  const handleFieldKeyDown = (e: React.KeyboardEvent, index: number) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      if (index === fieldRefs.length - 1) return; // on submit button, proceed with form submission
+      e.preventDefault();
+      fieldRefs[index + 1]?.current?.focus();
+    } else if (e.key === 'ArrowDown') {
+      if (index < fieldRefs.length - 1) {
+        e.preventDefault();
+        fieldRefs[index + 1]?.current?.focus();
+      }
+    } else if (e.key === 'ArrowUp') {
+      if (index > 0) {
+        e.preventDefault();
+        fieldRefs[index - 1]?.current?.focus();
+      }
+    }
+  };
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -64,6 +123,11 @@ export default function AddProductPage() {
 
   const handleBarcodeScanned = (scannedCode: string) => {
     setBarcode(scannedCode.trim());
+    setIsScannerOpen(false);
+    // After scanning, focus the barcode input or next field
+    setTimeout(() => {
+      barcodeRef.current?.focus();
+    }, 100);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -97,6 +161,7 @@ export default function AddProductPage() {
         barcode: barcode.trim() || null,
         category_id: categoryId || null,
         mrp: mrpNum,
+        discount: parseFloat(discount) || 0,
         selling_price: sellingPriceNum,
         retail_quantity: parseFloat(retailQuantity) || 0,
         warehouse_quantity: parseFloat(warehouseQuantity) || 0,
@@ -217,10 +282,12 @@ export default function AddProductPage() {
                   </label>
                   <input
                     id="product-name-input"
+                    ref={nameRef}
                     type="text"
                     required
                     value={name}
                     onChange={(e) => setName(e.target.value)}
+                    onKeyDown={(e) => handleFieldKeyDown(e, 0)}
                     placeholder="e.g. Premium California Almonds (500g)"
                     className="input-base w-full"
                   />
@@ -237,8 +304,10 @@ export default function AddProductPage() {
                   </label>
                   <select
                     id="product-category-select"
+                    ref={categoryRef}
                     value={categoryId}
                     onChange={(e) => setCategoryId(e.target.value)}
+                    onKeyDown={(e) => handleFieldKeyDown(e, 1)}
                     className="select-base w-full"
                   >
                     <option value="">-- Select Category --</option>
@@ -260,8 +329,10 @@ export default function AddProductPage() {
                   </label>
                   <select
                     id="product-status-select"
+                    ref={statusRef}
                     value={status}
                     onChange={(e) => setStatus(e.target.value as ProductStatus)}
+                    onKeyDown={(e) => handleFieldKeyDown(e, 2)}
                     className="select-base w-full"
                   >
                     <option value="active">Active</option>
@@ -281,9 +352,11 @@ export default function AddProductPage() {
                   <div className="flex gap-2">
                     <input
                       id="product-barcode-input"
+                      ref={barcodeRef}
                       type="text"
                       value={barcode}
                       onChange={(e) => setBarcode(e.target.value)}
+                      onKeyDown={(e) => handleFieldKeyDown(e, 3)}
                       placeholder="e.g. 8901030865421 or scan with camera"
                       className="input-base font-mono flex-1"
                     />
@@ -317,16 +390,38 @@ export default function AddProductPage() {
                   </label>
                   <input
                     id="product-mrp-input"
+                    ref={mrpRef}
                     type="number"
                     step="0.01"
                     min="0"
                     required
                     value={mrp}
                     onChange={(e) => setMrp(e.target.value)}
+                    onKeyDown={(e) => handleFieldKeyDown(e, 4)}
                     placeholder="0.00"
                     className="input-base w-full"
                   />
                   <span className="form-hint">Printed Maximum Retail Price</span>
+                </div>
+
+                {/* Discount */}
+                <div className="form-group">
+                  <label htmlFor="product-discount-input" className="form-label">
+                    Discount (₹)
+                  </label>
+                  <input
+                    id="product-discount-input"
+                    ref={discountRef}
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={discount}
+                    onChange={(e) => setDiscount(e.target.value)}
+                    onKeyDown={(e) => handleFieldKeyDown(e, 5)}
+                    placeholder="0.00"
+                    className="input-base w-full"
+                  />
+                  <span className="form-hint">Default discount value</span>
                 </div>
 
                 {/* Selling Price */}
@@ -336,12 +431,14 @@ export default function AddProductPage() {
                   </label>
                   <input
                     id="product-selling-price-input"
+                    ref={sellingPriceRef}
                     type="number"
                     step="0.01"
                     min="0"
                     required
                     value={sellingPrice}
                     onChange={(e) => setSellingPrice(e.target.value)}
+                    onKeyDown={(e) => handleFieldKeyDown(e, 6)}
                     placeholder="0.00"
                     className="input-base w-full font-bold text-primary"
                   />
@@ -362,11 +459,13 @@ export default function AddProductPage() {
                   </label>
                   <input
                     id="product-retail-qty-input"
+                    ref={retailQtyRef}
                     type="number"
                     step="0.001"
                     min="0"
                     value={retailQuantity}
                     onChange={(e) => setRetailQuantity(e.target.value)}
+                    onKeyDown={(e) => handleFieldKeyDown(e, 7)}
                     placeholder="0"
                     className="input-base w-full"
                   />
@@ -380,11 +479,13 @@ export default function AddProductPage() {
                   </label>
                   <input
                     id="product-warehouse-qty-input"
+                    ref={warehouseQtyRef}
                     type="number"
                     step="0.001"
                     min="0"
                     value={warehouseQuantity}
                     onChange={(e) => setWarehouseQuantity(e.target.value)}
+                    onKeyDown={(e) => handleFieldKeyDown(e, 8)}
                     placeholder="0"
                     className="input-base w-full"
                   />
@@ -399,11 +500,13 @@ export default function AddProductPage() {
                   </label>
                   <input
                     id="product-low-retail-input"
+                    ref={lowRetailRef}
                     type="number"
                     step="0.01"
                     min="0"
                     value={lowSellingPrice}
                     onChange={(e) => setLowSellingPrice(e.target.value)}
+                    onKeyDown={(e) => handleFieldKeyDown(e, 9)}
                     placeholder="5"
                     className="input-base w-full"
                   />
@@ -419,11 +522,13 @@ export default function AddProductPage() {
                   </label>
                   <input
                     id="product-low-warehouse-input"
+                    ref={lowWarehouseRef}
                     type="number"
                     step="0.001"
                     min="0"
                     value={lowWarehouseQuantity}
                     onChange={(e) => setLowWarehouseQuantity(e.target.value)}
+                    onKeyDown={(e) => handleFieldKeyDown(e, 10)}
                     placeholder="10"
                     className="input-base w-full"
                   />
@@ -445,9 +550,11 @@ export default function AddProductPage() {
 
                 <button
                   id="save-product-submit-btn"
+                  ref={submitBtnRef}
                   type="submit"
                   disabled={isSubmitting}
-                  className="btn-base btn-primary px-5 py-2.5 rounded-lg layout-flex-start gap-2 shadow-xs font-medium"
+                  onKeyDown={(e) => handleFieldKeyDown(e, 11)}
+                  className="btn-base btn-primary px-5 py-2.5 rounded-lg layout-flex-start gap-2 shadow-xs font-medium cursor-pointer"
                 >
                   <Save className="w-4 h-4" />
                   <span>{isSubmitting ? 'Saving to Database...' : 'Save Product'}</span>

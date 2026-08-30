@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -30,12 +30,19 @@ import {
 
 export default function AdminPaymentsPage() {
   const router = useRouter();
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   // Date Filters (default today)
   const todayStr = new Date().toISOString().split('T')[0];
   const [startDate, setStartDate] = useState<string>(todayStr);
   const [endDate, setEndDate] = useState<string>(todayStr);
   const [searchQuery, setSearchQuery] = useState<string>('');
+
+  // Directly focus the search bar input on page load
+  useEffect(() => {
+    searchInputRef.current?.focus();
+  }, []);
 
   // Pagination states (100 records per page)
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -145,18 +152,29 @@ export default function AdminPaymentsPage() {
   const paginatedBills = bills.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   return (
-    <div id="admin-payments-layout" className="flex min-h-screen bg-[var(--color-bg-app)]">
-      {/* Sidebar */}
-      <AdminSidebar />
+    <div id="admin-payments-layout" className="flex flex-col h-screen overflow-hidden bg-bg-app">
+      {/* Top Navigation Bar with Menu toggle (3 lines) */}
+      <AdminHeader
+        onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
+        onOpenSidebar={() => setIsSidebarOpen(true)}
+      />
 
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0">
-        <AdminHeader title="Total Payments & Sales" />
+      <div className="flex flex-1 overflow-hidden relative">
+        {/* Sidebar */}
+        <AdminSidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
 
-        <main className="flex-1 p-4 md:p-6 max-w-7xl w-full mx-auto space-y-6">
-          {/* Top Bar with Title and Expenses Button */}
+        {/* Main Content Area */}
+        <main id="admin-payments-main" className="flex-1 overflow-y-auto p-4 md:p-6 max-w-7xl w-full mx-auto space-y-6">
+          {/* Breadcrumbs & Top Bar with Title and Expenses Button */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-[var(--color-border-subtle)]">
             <div>
+              <div className="breadcrumb-nav mb-2">
+                <Link href="/admin/dashboard" className="breadcrumb-item">
+                  Home
+                </Link>
+                <span>/</span>
+                <span className="breadcrumb-item-active">Payments</span>
+              </div>
               <div className="flex items-center gap-2">
                 <span className="p-2 rounded-lg bg-[var(--color-primary-light)] text-[var(--color-primary)]">
                   <Wallet className="w-6 h-6" />
@@ -354,7 +372,7 @@ export default function AdminPaymentsPage() {
                     type="date"
                     value={startDate}
                     onChange={(e) => setStartDate(e.target.value)}
-                    className="input-base text-sm !pl-10 py-2 w-full"
+                    className="input-base input-with-icon-left text-sm py-2 w-full"
                   />
                 </div>
               </div>
@@ -371,7 +389,7 @@ export default function AdminPaymentsPage() {
                     type="date"
                     value={endDate}
                     onChange={(e) => setEndDate(e.target.value)}
-                    className="input-base text-sm !pl-10 py-2 w-full"
+                    className="input-base input-with-icon-left text-sm py-2 w-full"
                   />
                 </div>
               </div>
@@ -384,12 +402,14 @@ export default function AdminPaymentsPage() {
                 <div className="relative">
                   <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] pointer-events-none z-10" />
                   <input
+                    ref={searchInputRef}
                     id="filter-search-query"
                     type="text"
+                    autoFocus
                     placeholder="Search by Bill ID (e.g. BILL-...)"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="input-base text-sm !pl-10 py-2 w-full"
+                    className="input-base input-with-icon-left text-sm py-2 w-full"
                   />
                 </div>
               </div>

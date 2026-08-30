@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -35,10 +35,39 @@ function OpenCategoryContent() {
   const [categoryId, setCategoryId] = useState('');
   const [status, setStatus] = useState<CategoryStatus>('active');
 
+  // Input refs for keyboard navigation
+  const nameRef = useRef<HTMLInputElement | null>(null);
+  const categoryIdRef = useRef<HTMLInputElement | null>(null);
+  const statusRef = useRef<HTMLSelectElement | null>(null);
+  const submitBtnRef = useRef<HTMLButtonElement | null>(null);
+
   // Messages & Errors
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [nameError, setNameError] = useState<string | null>(null);
+
+  // Focus Category Name when category data is loaded
+  useEffect(() => {
+    if (category && !isLoading) {
+      nameRef.current?.focus();
+    }
+  }, [category, isLoading]);
+
+  // ESC key navigation to return to categories dashboard
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (showDeleteConfirm) {
+          setShowDeleteConfirm(false);
+          return;
+        }
+        e.preventDefault();
+        router.push('/admin/categories/dashboard');
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [router, showDeleteConfirm]);
 
   useEffect(() => {
     let isMounted = true;
@@ -87,8 +116,8 @@ function OpenCategoryContent() {
     return true;
   };
 
-  const handleUpdate = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleUpdate = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
 
     if (!category || !validateForm()) {
       return;
@@ -274,11 +303,21 @@ function OpenCategoryContent() {
                       </label>
                       <input
                         id="edit-category-name-input"
+                        ref={nameRef}
                         type="text"
                         value={name}
                         onChange={(e) => {
                           setName(e.target.value);
                           if (nameError) setNameError(null);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            categoryIdRef.current?.focus();
+                          } else if (e.key === 'ArrowDown') {
+                            e.preventDefault();
+                            categoryIdRef.current?.focus();
+                          }
                         }}
                         className={`input-base ${nameError ? 'input-error' : ''}`}
                         disabled={isSubmitting}
@@ -300,9 +339,22 @@ function OpenCategoryContent() {
                       </label>
                       <input
                         id="edit-category-id-input"
+                        ref={categoryIdRef}
                         type="text"
                         value={categoryId}
                         onChange={(e) => setCategoryId(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleUpdate();
+                          } else if (e.key === 'ArrowUp') {
+                            e.preventDefault();
+                            nameRef.current?.focus();
+                          } else if (e.key === 'ArrowDown') {
+                            e.preventDefault();
+                            statusRef.current?.focus();
+                          }
+                        }}
                         className="input-base font-mono"
                         disabled={isSubmitting}
                       />
@@ -318,8 +370,21 @@ function OpenCategoryContent() {
                       </label>
                       <select
                         id="edit-category-status-select"
+                        ref={statusRef}
                         value={status}
                         onChange={(e) => setStatus(e.target.value as CategoryStatus)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleUpdate();
+                          } else if (e.key === 'ArrowUp') {
+                            e.preventDefault();
+                            categoryIdRef.current?.focus();
+                          } else if (e.key === 'ArrowDown') {
+                            e.preventDefault();
+                            submitBtnRef.current?.focus();
+                          }
+                        }}
                         className="select-base"
                         disabled={isSubmitting}
                       >
@@ -371,9 +436,10 @@ function OpenCategoryContent() {
 
                       <button
                         id="save-changes-category-btn"
+                        ref={submitBtnRef}
                         type="submit"
                         disabled={isSubmitting}
-                        className="btn-base btn-primary btn-md"
+                        className="btn-base btn-primary btn-md cursor-pointer"
                       >
                         <Save className="w-4 h-4" />
                         <span>{isSubmitting ? 'Saving Changes...' : 'Save Changes'}</span>

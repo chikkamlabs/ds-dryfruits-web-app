@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, Suspense } from 'react';
+import React, { useEffect, useState, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -46,12 +46,16 @@ function OpenProductContent() {
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
   const [printCopies, setPrintCopies] = useState<number>(1);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Editable Form State
   const [name, setName] = useState('');
   const [barcode, setBarcode] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [mrp, setMrp] = useState<string>('0');
+  const [discount, setDiscount] = useState<string>('0');
   const [sellingPrice, setSellingPrice] = useState<string>('0');
   const [retailQuantity, setRetailQuantity] = useState<string>('0');
   const [warehouseQuantity, setWarehouseQuantity] = useState<string>('0');
@@ -59,9 +63,121 @@ function OpenProductContent() {
   const [lowWarehouseQuantity, setLowWarehouseQuantity] = useState<string>('0');
   const [status, setStatus] = useState<ProductStatus>('active');
 
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  // Input Field References for keyboard navigation (skipping barcode field on Enter as instructed)
+  const nameRef = useRef<HTMLInputElement | null>(null);
+  const categoryRef = useRef<HTMLSelectElement | null>(null);
+  const statusRef = useRef<HTMLSelectElement | null>(null);
+  const barcodeRef = useRef<HTMLInputElement | null>(null);
+  const mrpRef = useRef<HTMLInputElement | null>(null);
+  const discountRef = useRef<HTMLInputElement | null>(null);
+  const sellingPriceRef = useRef<HTMLInputElement | null>(null);
+  const retailQtyRef = useRef<HTMLInputElement | null>(null);
+  const warehouseQtyRef = useRef<HTMLInputElement | null>(null);
+  const lowRetailRef = useRef<HTMLInputElement | null>(null);
+  const lowWarehouseRef = useRef<HTMLInputElement | null>(null);
+  const submitBtnRef = useRef<HTMLButtonElement | null>(null);
+
+  // Modal print copies and done button refs
+  const printCopiesInputRef = useRef<HTMLInputElement | null>(null);
+  const donePrintBtnRef = useRef<HTMLButtonElement | null>(null);
+
+  // Focus at product name when product data is loaded
+  useEffect(() => {
+    if (product && !isLoading) {
+      nameRef.current?.focus();
+    }
+  }, [product, isLoading]);
+
+  // ESC key navigation to return to products dashboard
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (isScannerOpen) {
+          setIsScannerOpen(false);
+          return;
+        }
+        if (isPrintModalOpen) {
+          setIsPrintModalOpen(false);
+          return;
+        }
+        if (showDeleteConfirm) {
+          setShowDeleteConfirm(false);
+          return;
+        }
+        e.preventDefault();
+        router.push('/admin/products/dashboard');
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [router, isScannerOpen, isPrintModalOpen, showDeleteConfirm]);
+
+  // When print modal opens, focus at copies input
+  useEffect(() => {
+    if (isPrintModalOpen) {
+      setTimeout(() => {
+        printCopiesInputRef.current?.focus();
+        printCopiesInputRef.current?.select();
+      }, 50);
+    }
+  }, [isPrintModalOpen]);
+
+  // Sequential order for Enter key navigation
+  const enterFlowRefs = [
+    nameRef,
+    categoryRef,
+    statusRef,
+    barcodeRef,
+    mrpRef,
+    discountRef,
+    sellingPriceRef,
+    retailQtyRef,
+    warehouseQtyRef,
+    lowRetailRef,
+    lowWarehouseRef,
+    submitBtnRef,
+  ];
+
+  // All fields for arrow up/down navigation
+  const allFieldRefs = [
+    nameRef,
+    categoryRef,
+    statusRef,
+    barcodeRef,
+    mrpRef,
+    discountRef,
+    sellingPriceRef,
+    retailQtyRef,
+    warehouseQtyRef,
+    lowRetailRef,
+    lowWarehouseRef,
+    submitBtnRef,
+  ];
+
+  const handleFieldKeyDown = (
+    e: React.KeyboardEvent,
+    currentRef: React.RefObject<HTMLInputElement | HTMLSelectElement | HTMLButtonElement | null>
+  ) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      const enterIndex = enterFlowRefs.findIndex((r) => r === currentRef);
+      if (enterIndex > -1 && enterIndex < enterFlowRefs.length - 1) {
+        e.preventDefault();
+        enterFlowRefs[enterIndex + 1]?.current?.focus();
+      }
+    } else if (e.key === 'ArrowDown') {
+      const allIndex = allFieldRefs.findIndex((r) => r === currentRef);
+      if (allIndex > -1 && allIndex < allFieldRefs.length - 1) {
+        e.preventDefault();
+        allFieldRefs[allIndex + 1]?.current?.focus();
+      }
+    } else if (e.key === 'ArrowUp') {
+      const allIndex = allFieldRefs.findIndex((r) => r === currentRef);
+      if (allIndex > 0) {
+        e.preventDefault();
+        allFieldRefs[allIndex - 1]?.current?.focus();
+      }
+    }
+  };
 
   // Fetch product and categories
   const loadProductData = async () => {
@@ -92,6 +208,7 @@ function OpenProductContent() {
       setBarcode(p.barcode || '');
       setCategoryId(p.category_id || '');
       setMrp(String(p.mrp ?? 0));
+      setDiscount(String(p.discount ?? 0));
       setSellingPrice(String(p.selling_price ?? 0));
       setRetailQuantity(String(p.retail_quantity ?? 0));
       setWarehouseQuantity(String(p.warehouse_quantity ?? 0));
@@ -136,6 +253,7 @@ function OpenProductContent() {
         setBarcode(p.barcode || '');
         setCategoryId(p.category_id || '');
         setMrp(String(p.mrp ?? 0));
+        setDiscount(String(p.discount ?? 0));
         setSellingPrice(String(p.selling_price ?? 0));
         setRetailQuantity(String(p.retail_quantity ?? 0));
         setWarehouseQuantity(String(p.warehouse_quantity ?? 0));
@@ -156,6 +274,10 @@ function OpenProductContent() {
 
   const handleBarcodeScanned = (scannedCode: string) => {
     setBarcode(scannedCode.trim());
+    setIsScannerOpen(false);
+    setTimeout(() => {
+      barcodeRef.current?.focus();
+    }, 100);
   };
 
   // Update Product
@@ -192,6 +314,7 @@ function OpenProductContent() {
         barcode: barcode.trim() || null,
         category_id: categoryId || null,
         mrp: mrpNum,
+        discount: parseFloat(discount) || 0,
         selling_price: sellingPriceNum,
         retail_quantity: parseFloat(retailQuantity) || 0,
         warehouse_quantity: parseFloat(warehouseQuantity) || 0,
@@ -398,10 +521,12 @@ function OpenProductContent() {
                         </label>
                         <input
                           id="edit-product-name"
+                          ref={nameRef}
                           type="text"
                           required
                           value={name}
                           onChange={(e) => setName(e.target.value)}
+                          onKeyDown={(e) => handleFieldKeyDown(e, nameRef)}
                           className="input-base w-full font-medium"
                         />
                       </div>
@@ -414,8 +539,10 @@ function OpenProductContent() {
                         </label>
                         <select
                           id="edit-product-category"
+                          ref={categoryRef}
                           value={categoryId}
                           onChange={(e) => setCategoryId(e.target.value)}
+                          onKeyDown={(e) => handleFieldKeyDown(e, categoryRef)}
                           className="select-base w-full"
                         >
                           <option value="">-- No Category --</option>
@@ -434,8 +561,10 @@ function OpenProductContent() {
                         </label>
                         <select
                           id="edit-product-status"
+                          ref={statusRef}
                           value={status}
                           onChange={(e) => setStatus(e.target.value as ProductStatus)}
+                          onKeyDown={(e) => handleFieldKeyDown(e, statusRef)}
                           className="select-base w-full"
                         >
                           <option value="active">Active</option>
@@ -452,9 +581,11 @@ function OpenProductContent() {
                         <div className="flex gap-2">
                           <input
                             id="edit-product-barcode"
+                            ref={barcodeRef}
                             type="text"
                             value={barcode}
                             onChange={(e) => setBarcode(e.target.value)}
+                            onKeyDown={(e) => handleFieldKeyDown(e, barcodeRef)}
                             placeholder="Enter barcode or scan..."
                             className="input-base font-mono flex-1"
                           />
@@ -485,12 +616,32 @@ function OpenProductContent() {
                         </label>
                         <input
                           id="edit-product-mrp"
+                          ref={mrpRef}
                           type="number"
                           step="0.01"
                           min="0"
                           required
                           value={mrp}
                           onChange={(e) => setMrp(e.target.value)}
+                          onKeyDown={(e) => handleFieldKeyDown(e, mrpRef)}
+                          className="input-base w-full"
+                        />
+                      </div>
+
+                      {/* Discount */}
+                      <div className="form-group">
+                        <label htmlFor="edit-product-discount" className="form-label">
+                          Discount (₹)
+                        </label>
+                        <input
+                          id="edit-product-discount"
+                          ref={discountRef}
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={discount}
+                          onChange={(e) => setDiscount(e.target.value)}
+                          onKeyDown={(e) => handleFieldKeyDown(e, discountRef)}
                           className="input-base w-full"
                         />
                       </div>
@@ -502,12 +653,14 @@ function OpenProductContent() {
                         </label>
                         <input
                           id="edit-product-selling-price"
+                          ref={sellingPriceRef}
                           type="number"
                           step="0.01"
                           min="0"
                           required
                           value={sellingPrice}
                           onChange={(e) => setSellingPrice(e.target.value)}
+                          onKeyDown={(e) => handleFieldKeyDown(e, sellingPriceRef)}
                           className="input-base w-full font-bold text-primary"
                         />
                       </div>
@@ -526,11 +679,13 @@ function OpenProductContent() {
                         </label>
                         <input
                           id="edit-product-retail-qty"
+                          ref={retailQtyRef}
                           type="number"
                           step="0.001"
                           min="0"
                           value={retailQuantity}
                           onChange={(e) => setRetailQuantity(e.target.value)}
+                          onKeyDown={(e) => handleFieldKeyDown(e, retailQtyRef)}
                           className="input-base w-full"
                         />
                       </div>
@@ -542,11 +697,13 @@ function OpenProductContent() {
                         </label>
                         <input
                           id="edit-product-warehouse-qty"
+                          ref={warehouseQtyRef}
                           type="number"
                           step="0.001"
                           min="0"
                           value={warehouseQuantity}
                           onChange={(e) => setWarehouseQuantity(e.target.value)}
+                          onKeyDown={(e) => handleFieldKeyDown(e, warehouseQtyRef)}
                           className="input-base w-full"
                         />
                       </div>
@@ -558,11 +715,13 @@ function OpenProductContent() {
                         </label>
                         <input
                           id="edit-product-low-retail"
+                          ref={lowRetailRef}
                           type="number"
                           step="0.01"
                           min="0"
                           value={lowSellingPrice}
                           onChange={(e) => setLowSellingPrice(e.target.value)}
+                          onKeyDown={(e) => handleFieldKeyDown(e, lowRetailRef)}
                           className="input-base w-full"
                         />
                       </div>
@@ -573,11 +732,13 @@ function OpenProductContent() {
                         </label>
                         <input
                           id="edit-product-low-warehouse"
+                          ref={lowWarehouseRef}
                           type="number"
                           step="0.001"
                           min="0"
                           value={lowWarehouseQuantity}
                           onChange={(e) => setLowWarehouseQuantity(e.target.value)}
+                          onKeyDown={(e) => handleFieldKeyDown(e, lowWarehouseRef)}
                           className="input-base w-full"
                         />
                       </div>
@@ -595,9 +756,11 @@ function OpenProductContent() {
 
                       <button
                         id="save-changes-submit-btn"
+                        ref={submitBtnRef}
                         type="submit"
                         disabled={isSaving}
-                        className="btn-base btn-primary layout-flex-start gap-2"
+                        onKeyDown={(e) => handleFieldKeyDown(e, submitBtnRef)}
+                        className="btn-base btn-primary layout-flex-start gap-2 cursor-pointer"
                       >
                         <Save className="w-4 h-4" />
                         <span>{isSaving ? 'Saving Changes...' : 'Save Changes'}</span>
@@ -746,11 +909,18 @@ function OpenProductContent() {
                   </button>
                   <input
                     id="print-copies-input"
+                    ref={printCopiesInputRef}
                     type="number"
                     min="1"
                     max="1000"
                     value={printCopies}
                     onChange={(e) => setPrintCopies(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        donePrintBtnRef.current?.focus();
+                      }
+                    }}
                     className="input-base text-center font-bold w-24 text-base"
                   />
                   <button
@@ -777,6 +947,7 @@ function OpenProductContent() {
               </button>
               <button
                 id="done-print-barcode-btn"
+                ref={donePrintBtnRef}
                 type="button"
                 onClick={() => setIsPrintModalOpen(false)}
                 className="btn-base btn-primary layout-flex-start gap-2"

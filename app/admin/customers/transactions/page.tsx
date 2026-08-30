@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, Suspense, useCallback } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
   History,
@@ -29,6 +29,7 @@ import {
 import type { Customer, TransactionCalculation } from '@/lib/types';
 
 function CustomerTransactionsContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const customerParamId = searchParams.get('id');
 
@@ -51,6 +52,22 @@ function CustomerTransactionsContent() {
   const [isSubmittingTx, setIsSubmittingTx] = useState(false);
   const [modalError, setModalError] = useState<string | null>(null);
   const [modalSuccess, setModalSuccess] = useState<string | null>(null);
+
+  // ESC key navigation to tap Customer Directory button and come to Customers dashboard
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (showAddTxModal) {
+          setShowAddTxModal(false);
+          return;
+        }
+        e.preventDefault();
+        router.push('/admin/customers/dashboard');
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [router, showAddTxModal]);
 
   const loadData = useCallback(async () => {
     if (!customerParamId) {
@@ -345,7 +362,7 @@ function CustomerTransactionsContent() {
                       onClick={() => setCalcFilter('all')}
                       className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${
                         calcFilter === 'all'
-                          ? 'bg-primary text-inverted shadow-xs font-bold'
+                          ? '!bg-[#5d4037] !text-white shadow-xs font-bold'
                           : 'text-secondary hover:text-primary hover:bg-surface'
                       }`}
                     >
@@ -357,7 +374,7 @@ function CustomerTransactionsContent() {
                       onClick={() => setCalcFilter('sum')}
                       className={`px-3 py-1.5 text-xs font-semibold rounded-md flex items-center gap-1.5 transition-colors ${
                         calcFilter === 'sum'
-                          ? 'bg-accent text-inverted shadow-xs font-bold'
+                          ? '!bg-[#5d4037] !text-white shadow-xs font-bold'
                           : 'text-secondary hover:text-primary hover:bg-surface'
                       }`}
                     >
@@ -370,7 +387,7 @@ function CustomerTransactionsContent() {
                       onClick={() => setCalcFilter('subtract')}
                       className={`px-3 py-1.5 text-xs font-semibold rounded-md flex items-center gap-1.5 transition-colors ${
                         calcFilter === 'subtract'
-                          ? 'bg-success text-inverted shadow-xs font-bold'
+                          ? '!bg-[#5d4037] !text-white shadow-xs font-bold'
                           : 'text-secondary hover:text-primary hover:bg-surface'
                       }`}
                     >
@@ -689,7 +706,7 @@ function CustomerTransactionsContent() {
                     Amount (₹) <span className="text-danger">*</span>
                   </label>
                   <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary font-bold">
+                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-secondary font-bold pointer-events-none z-10">
                       ₹
                     </span>
                     <input
@@ -700,7 +717,7 @@ function CustomerTransactionsContent() {
                       value={newTxAmount}
                       onChange={(e) => setNewTxAmount(e.target.value)}
                       placeholder="0.00"
-                      className="input-base pl-8 font-mono"
+                      className="input-base input-with-icon-left font-mono w-full"
                       disabled={isSubmittingTx}
                       autoFocus
                       required
