@@ -27,6 +27,9 @@ import { getCustomers, createCustomer } from '@/lib/customersStore';
 import { createBill } from '@/lib/createorderStore';
 import type { Product, Customer, PaymentMode, BillStatus } from '@/lib/types';
 
+import { generateBill, type GeneratedBill } from '@/lib/generateBill';
+import BillPreview from '@/components/BillPreview';
+
 interface BilledRowItem {
   id: string; // unique row id
   product_id: string;
@@ -48,6 +51,7 @@ export default function CreateBillPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [billPreview, setBillPreview] = useState<GeneratedBill | null>(null);
 
   // Scanner Modal
   const [scannerOpen, setScannerOpen] = useState(false);
@@ -617,8 +621,18 @@ export default function CreateBillPage() {
       });
 
       if (printAfterSave) {
-        window.print();
-      }
+  const generatedBill = generateBill({
+    billId: res.data.bill_id,
+    customer: selectedCustomer,
+    items,
+    subtotal,
+    discount,
+    total,
+    payments: paymentsList,
+  });
+
+  setBillPreview(generatedBill);
+}
 
       // Reset form for next customer bill
       setTimeout(() => {
@@ -1362,6 +1376,11 @@ export default function CreateBillPage() {
         onClose={() => setScannerOpen(false)}
         onScan={handleBarcodeScanned}
       />
+
+      <BillPreview
+  bill={billPreview}
+  onClose={() => setBillPreview(null)}
+/>
     </div>
   );
 }
